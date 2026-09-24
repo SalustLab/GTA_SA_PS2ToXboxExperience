@@ -2,7 +2,7 @@
 
 Legend: **[C]** Confirmed (read from bytes/source), **[S]** Strongly inferred, **[H]** Hypothesis requiring testing.
 
-> **Status 2026-09-24:** Phases 0–2 are done (E0, E3, E4, P1 booted). Phase 3 is done (P2 blur, v0.2 candidate `gtasa_p2p5.xiso`). Corrections from live measurement are marked **(2026-09-24)** below; the evidence is in `docs/findings.md`.
+> **Status 2026-09-24:** Phases 0–2 are done (E0, E3, E4, P1 booted). Phase 3 is done (P2 blur, v0.2 candidate `gtasa_p2p5.xiso`). Phase 4 is done (P3 radiosity, v0.3 candidate `gtasa_p2p3p5.xiso`). Corrections from live measurement are marked **(2026-09-24)** below; the evidence is in `docs/findings.md`.
 Xbox addresses are VAs in `default.xbe` USA Rev 1 (SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5`). File offset = VA − 0x10000 (.text), VA − 0xFB60 (.data), VA − 0x10280 (.rdata). Any .data VA ≥ 0x3D2C04 is BSS (zero at boot).
 
 Routing evidence:
@@ -74,7 +74,7 @@ The minimum viable mod is therefore **a `default.xbe` binary patch plus a 3-line
 | Timecycle alpha | 0..127, 128=1.0 | ×2 at load (`fadd st0,st0` at 0x1572A4 / 0x1572B4) [C] | Nop'd for the PS2 path | keep (compensate in the filter) |
 | **Colour filter** | `fb·2c1 + fb′·2c2·(2a2/255)` | `fb + fb·c1·A1 + fb·c2·A2` [C], **then diluted by the Xbox blur pass (next row)** (2026-09-24) | `ColourFilter_PS2` | **P1 done:** rewrite of `0x24F007` (MODULATE2X) |
 | **Xbox blur pass** (2026-09-24) | absent | `0x24ECAA`, after the filter: 2× lerp of the *pre-filter* copy at α 60 → `out = 0.585·F + 0.415·raw` [C] (enable byte `0x3CE7AD`, count `0x3CE7B4`, alpha `0x3CE7B8`, UV scale `0x3CE7B0`) | — | **P1:** `0x3CE7AD` 1 → 0 |
-| **Radiosity** | on (`pe_bRadiosity 1`) | flag 0x5F4B1C = 0; function 0x24DF8E is broken [C]/[S] | PS2 / shader | **XBE rewrite** of 0x24DF8E + ini `pe_bRadiosity 1` |
+| **Radiosity** | on (`pe_bRadiosity 1`; flag 0x66CEC8 [C]) | flag 0x5F4B1C = 0; function 0x24DF8E is broken [C] (E2) | PS2 (fixed-function path) | **P3 built** (rewrite of 0x24DF8E) + ini `pe_bRadiosity 1` |
 | **Filter blur** | offsets 8 → ½ px, linear (PS2 globals 0x668D28 [C]) | offsets unused; NEAREST [C] | `m_bBlurColourFilter` | **P2 built** (UV offsets + LINEAR) + ini 8 |
 | Dark-area boost | basemult 0.4, rate 0.0008 | 0.5 / 0.0005 (exe default 1.0) [C] | same code | **ini only** |
 | Building ambient/2× | ambient ≈×2, sums above 1 allowed | no 2× [S] | `ps2ModulateBuilding` | XBE constant/VS patch (phase 4) |
@@ -105,8 +105,8 @@ Not factors [C]: timecyc values, vertex colours, textures, plants/effects data, 
 - **H1 — Confirmed (E3, P1 boot).** The filter formula explains most of the colour gap. *Prediction:* applying the PS2 formula offline to a Xbox postfx-off frame brings its mean R/B ratio and hue histogram to within noise of the PS2 capture of the same scene. Applying the Xbox formula leaves a large gap.
 - **H2 — Confirmed (E2, 2026-09-24).** The flag only adds an edge shift/blur, no bloom. Original text: Xbox radiosity is non-functional. *Prediction:* `pe_bRadiosity 1` produces no visible change, or thin-line artifacts only.
 - **H3 — Refuted as stated / resolved (2026-09-24).** The fb copy is X8R8G8B8, so its alpha reads 1.0 and `ALPHAOP=MODULATE` is fine. The measured 0.585 factor came from the Xbox blur pass, not from alpha. Original text: Pass 2's framebuffer alpha reads as 1.0 on Xbox. *Prediction:* the PS2 formula with `ALPHAOP=MODULATE` matches `predict_filter.py` within ±2 levels. If not, the backbuffer is A8R8G8B8 with geometry alpha, and `SELECTARG2` (diffuse) must be used.
-- **H4 — leaning /255 [S] (offline model, 2026-09-24: /255 brings the noon sky ΔE 6.3 → 3.3, /128 overshoots to 10.2).** PS2 radiosity intensity is `intensity/128` (aap's text), not SkyGfx's `/255`. *Prediction:* the bloom energy in PS2 captures matches `/128` better.
-- **H5 — leading candidate for the night-asphalt residual [S] (2026-09-24: PS2 − P1 ≈ +2/+8/+7 teal at matched luminance; gamma, E1 and radiosity ruled out).** The remaining brightness gap in shadow/night is building ambient ×2. *Prediction:* doubling the uploaded ambient VS constant closes the dark-region luminance gap without shifting hue.
+- **H4 — Confirmed /255 (E6, 2026-09-24): the PS2's own radiosity on/off at Grove St noon is fitted by SkyGfx's operator at the timecyc limit 180, intensity 35, /255 (bias ≈ 0; /128 clearly worse).** PS2 radiosity intensity is `intensity/128` (aap's text), not SkyGfx's `/255`. *Prediction:* the bloom energy in PS2 captures matches `/128` better.
+- **H5 — leading candidate for the night-asphalt residual [S] (2026-09-24: PS2 − P1 ≈ +2/+8/+7 teal at matched luminance; gamma, E1 and radiosity ruled out).** The remaining brightness gap in shadow/night is building ambient ×2. *Prediction:* doubling the uploaded ambient VS constant closes the dark-region luminance gap without shifting hue. **Counter-evidence (2026-09-24, CJ's house at 12:00):** the Xbox interior is *brighter* in the darks than the PS2 before radiosity (median luminance 18 vs 8), so P4 must handle both directions (findings "P3 interior check").
 
 ## 8. Data-only modifications worth testing
 
@@ -152,7 +152,9 @@ Original design (kept for reference):
 - The vertex ordering must be mapped to SkyGfx's (left/top on v0,v1 / v0,v3; right/bottom on v2,v3 / v1,v2). **Verified live 2026-09-24: 0x5C7318 is v0 TL, v1 BL, v2 BR, v3 TR, so the SkyGfx mapping applies as is.**
 - Xbox ini offsets are 16 (a full texel on the 1024×512 copy, no blur); the PS2 uses 8 (half texel + LINEAR = the soft blur). Restore the UVs after pass 2 (the quad persists across frames). Code cave candidate: the dead Xbox blur pass 0x24ECAA (0x1F8 B). See findings "Phase 3 prep".
 
-**P3 — Radiosity rewrite.** Replace the body of `0x24DF8E` (≈2.4 KB up to 0x24E90C, used as the code cave). Keep its ABI: stack = limit, filterPasses, intensity; EAX = renderPasses. It is also called by the darkness filter with (45, 0, 255, 2).
+**P3 — Radiosity. BUILT (2026-09-24):** `patches/p3_radiosity.py` → `.json`, 978 of 1413 B in place (the stock function ends at 0x24E512; 0x24E513+ are other functions). SkyGfx's fixed-function PS2 radiosity on the two Xbox surfaces: `0x24BB7B` copies F to C; downsample hops ping-pong C → backbuffer corner → C strip x ≥ 640 (postfx camera `0x5F4B30`, SkyGfx geometry with UC/VC 2); highlight `2D − limit` = stage-0 ADDSIGNED2X with vertex grey 128 − L·128/255; restore the backbuffer 1:1, add the stretched highlight with SRCALPHA/ONE, A = intensity (/255) × renderPasses; copy again (UpdateFrontBuffer). No new raster and no Initialise patch. E6 live: 100 % within ±2 of `model()` at noon, midnight and on the darkness-filter path. Ship `pe_bRadiosity 1` (on the ISO it replaces the equivalent `devkit_memory` line, same size).
+
+Original design (kept for reference): replace the body of `0x24DF8E` (≈2.4 KB up to 0x24E90C, used as the code cave). Keep its ABI: stack = limit, filterPasses, intensity; EAX = renderPasses. It is also called by the darkness filter with (45, 0, 255, 2).
 1. Re-copy the filtered backbuffer (call `0x24BB7B`).
 2. Downsample ×filterPasses, halving each time with LINEAR filtering and UV correction `(corr+0.5)/w` (globals 0x3CE7C4..D8), ping-ponging between the backbuffer corner and a small raster.
 3. Highlight pass with fixed-function stages: stage0 `SUBTRACT(TEXTURE, TFACTOR=limit/2)`, stage1 `ADD(CURRENT, CURRENT)` → `2D − limit`.
@@ -268,9 +270,9 @@ SA-PS2Atmosphere/
 - The Xbox blur pass also gives a slight softness; with it off, P2 must supply the PS2 softness.
 - Real hardware: the formulas are verified in LLE xemu + HLE Cxbx only.
 - The Xbox D3D deferred-state index layout; getting it wrong corrupts the HUD. Mitigation: the restore step + the 4-draw fallback.
-- The radiosity code cave (2.4 KB) may be too small → append an XBE section (header space must be checked) or use the dead stream.ini-offset code.
+- ~~The radiosity code cave may be too small~~ resolved: P3 fits in 978 of the 1413 B.
 - Radiosity performance at 480p on NV2A (low risk; PS2 did it at ½ res).
-- H4 intensity scale ambiguity (/128 vs /255); resolve empirically against PCSX2.
+- ~~H4 intensity scale~~ resolved: /255.
 - PCSX2 blending inaccuracy contaminating the reference.
 - The Xbox building pipe formula is inferred from SkyGfx's reimplementation, not yet from Xbox microcode.
 - Only USA Rev 1 is supported; other XBE revisions need re-anchoring (the patcher refuses by hash).
@@ -286,7 +288,7 @@ SA-PS2Atmosphere/
 - **Phase 1 — Cheap proofs (E1–E3).** E3 ✅ (H1 confirmed); E2 ✅ (H2 confirmed, 2026-09-24); E1 measured in code + live (the lighting mult scales the filter colours by ≤1+basemult; ~1% at Grove St at night, so low rank confirmed; ini not changed). ini edits, the radiosity-flag test, the offline filter transplant. Gate: H1 confirmed (otherwise re-rank before patching).
 - **Phase 2 — P1 ColourFilter (E4).** ✅ E4 passed, v0.1 candidate booted (`work/xbox/gtasa_p1.xiso`); in-game interior check ✅ (2026-09-24, CJ house, 100% within ±2 outside animated pixels, HUD intact); night check ✅ (Grove St 00:00, 98.6% within ±2 on filtered pixels); P5 built and boot-tested (`gtasa_p1p5.xiso`); pause-menu check ✅ (ColourFilter not called in menus; identical to stock). **Phase 2 closed 2026-09-24.** RE targets 1–3, then patch, then the deterministic loop. **This alone delivers the core orange atmosphere.** Ship-able milestone v0.1.
 - **Phase 3 — P2 blur (E5)** + ini offsets 8 → v0.2. **In progress:** RE target 3a done; P2 built, live RAM test ✅, E5 ✅ [S] (2026-09-24). Boot test ✅ (`gtasa_p2p5.xiso`, 99.0 % within ±2, HUD intact); visual sign-off ✅. **Phase 3 closed 2026-09-24.**
-- **Phase 4 — P3 radiosity (E6).** RE target 4, then Initialise raster + rewrite + ini `pe_bRadiosity 1`, then calibrate against PS2 (H4) → v0.3.
+- **Phase 4 — P3 radiosity (E6).** RE target 4, then Initialise raster + rewrite + ini `pe_bRadiosity 1`, then calibrate against PS2 (H4) → v0.3. **In progress (2026-09-24):** P3 built without a new raster (camera switch into the copy's off-screen strip); PS2 calibration ✅ (H4 = /255); live RAM test ✅ (100 % within ±2 on all three paths). Boot test ✅ (100 % within ±2); pause-menu check ✅ (not called in menus); visual sign-off ✅. **Phase 4 closed 2026-09-24.**
 - **Phase 5 — P4 building ambient (E7)** → v0.4, only if dark-scene metrics still diverge.
 - **Phase 6 — Optional polish.** Foliage dual pass, grass ambient, the gamma/display filter investigation (RE target 7).
 - **Phase 7 — Distribution.** xdelta + patcher + README; test on a clean Rev 1 copy in xemu (and real hardware if available).
@@ -295,12 +297,13 @@ SA-PS2Atmosphere/
 
 - **Builds:** `dist/default_p1p5.xbe` (P1 + P5; sha1 9c4db1ab…) → `work/xbox/gtasa_p1p5.xiso`, boot-tested. `dist/default_p1.xbe` / `gtasa_p1.xiso` are kept. `dist/default_p2p5.xbe` (P2 + P5; sha1 ed5c41e3…) → `work/xbox/gtasa_p2p5.xiso` (embedded stream.ini pe 8), boot-tested ✅.
 - **Test saves:**
-  - xemu HDD: slots 1–3. Slot 2 = EU "Ryder", converted and verified in-game. It stores brightness 384; set 256 in Options → Display, or with `work/session_tools/xbright.py 256`. Original HDD backed up as `E:\Emuladores\xemu\xbox_hdd.qcow2.bak_20260924`.
+  - xemu HDD: slots 1–3. Slot 2 = EU "Ryder", converted and verified in-game. Slot 1 (2026-09-24) = the same save re-saved by the user with brightness 256 (the genuine v2 "Big Smoke" save that was there is gone from the HDD; the original is still in `xbox_hdd.qcow2.bak_20260924`). It stores brightness 384; set 256 in Options → Display, or with `work/session_tools/xbright.py 256`. Original HDD backed up as `E:\Emuladores\xemu\xbox_hdd.qcow2.bak_20260924`.
   - PCSX2 `Mcd001.ps2` slot 1: "Tagging up Turf", native v3.00 (backup `Mcd001.ps2.bak_20260924`; `mymcplus` is installed via pip).
 - **Reference scene:** Grove St (2488.2, −1665.5, 13.3), heading 1.4309, weather 0, at 12:00 and 00:00. Paired captures: `work/session_tools/scene.py`. Existing sets: `captures/grove_{noon,night}_gammafix/`.
 - **Capture rule update:** with P5 and brightness 256 the Xbox ramp is the identity, so captures need no linearization. Otherwise read the ramp first (CLAUDE.md "Gamma").
-- **P2 boot-tested** (findings "P2 filter blur"). Visual sign-off ✅ with pe 8. Next: Phase 4 (P3 radiosity).
-- **Then:** P3 radiosity (Initialise raster alloc, RE target 3b/4; calibrate limit/intensity vs PS2; /255 favoured). After that, P4 ambient: the building-pipe VS constants are written **inline into the push buffer** (SetVertexShaderConstant* sees only Im2D c96), so RE target 5 must locate those writers.
+- **P2 boot-tested** (findings "P2 filter blur"). Visual sign-off ✅ with pe 8.
+- **P3 built + live-tested** (findings "Phase 4"): `dist/default_p2p3p5.xbe` (sha1 d7e1d28c…) → `work/xbox/gtasa_p2p3p5.xiso` (ini pe 8 + `pe_bRadiosity 1`). Boot-tested ✅, menu ✅, signed off ✅ (v0.3 candidate). Next: Phase 5 (P4 building ambient). Remaining noon gap after P3 is the Xbox ground being brighter than the PS2's before radiosity (upstream: P4/H5 or framing).
+- **Then:** P4 ambient: the building-pipe VS constants are written **inline into the push buffer** (SetVertexShaderConstant* sees only Im2D c96), so RE target 5 must locate those writers.
 
 ## Execution context (for any executor)
 

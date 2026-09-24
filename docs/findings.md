@@ -399,3 +399,59 @@ Symbols come from the Cxbx-Reloaded symbol cache (`E:\Emuladores\Cxbx-Reloaded\S
 - **P2 boot test (2026-09-24) [C]:** `gtasa_p2p5.xiso` boots, and slot 2 loads. Live: all P2 and P5 bytes equal the JSONs; pe offsets are 8 ×4, read from the ISO's edited `stream.ini`; blur byte 0x3CE7AD = 1, as expected (P2 NOPs the call instead). Grove St 12:00, c1 66,66,48,a254, c2 166,129,60,a254: P2 vs `predict(raw, shift=0.5)` = **99.0 % within ±2** (MAE 0.63/0.62/0.35) with the overlays and animated characters masked (help box, Stats panel, HUD, CJ, one pedestrian; 69.7 % of the frame kept). The unshifted model gets 58.1 %. The unmasked frame gives 93.2 %, and all of the excess is the translucent HUD boxes (drawn after the filter) and CJ's idle animation. The HUD renders crisp and complete. Files: `captures/grove_noon_p2boot/`.
   - Brightness after "set 256" in the menu read **284** (`[0x6E79AC]`, ramp max +4, not the identity). The captures were linearized with the captured ramp. For exact-identity captures use `work/session_tools/xbright.py 256`.
 - **Visual sign-off (2026-09-24):** the user accepted P2 with pe 8 against the PS2. Phase 3 is closed.
+
+## 2026-09-24 — Phase 4: P3 radiosity (RE targets 3b/4, build, E6 live)
+
+**RE [C]:**
+- Stock `CPostEffects::Radiosity` is **0x24DF8E–0x24E512 (1413 B)**, not ~2.4 KB: 0x24E513 (darkness quad), 0x24E55E and 0x24E665 are separate functions with their own callers. References: only `call` at 0x24CD7D (main: limit = `[0x5F4B1E]` ? `[0x3CE7CC]` 220 : timecyc `[0x6C88DC]`; filterPasses `[0x3CE7C4]` 2, intensity `[0x3CE7D0]` 35, eax = renderPasses `[0x3CE7C8]` 1; skipped while the darkness filter `[0x5F4B14]` is on) and 0x24CB32 (darkness filter: `[0x3CE7A4]` 45, 0, 255, eax 2). UV corrections `[0x3CE7D4/D8]` = 2/2. The same defaults as PC `CPostEffects::m_Radiosity*`.
+- Render order: 0x24BB7B (copy) → ColourFilter → darkness filter + radiosity → … → radiosity 0x24CD7D. No copy between the filter and the radiosity: the stock function samples the **pre-filter** copy. It builds a 2-vertex-per-rect sprite list at 0x5DB7C0 and draws it as a tristrip through 0x263B40, which degenerates on Xbox (the E2 result).
+- `0x24BB7B` = RwCameraEndUpdate (0x2977F0, jmp [cam+0x1C]) on the scene camera `[0x5B8528]`, RwCameraBeginUpdate (0x297800, jmp [cam+0x18]) on the postfx camera `[0x5F4B30]` (raster = the copy 0x5F4B28, 1024×512, confirmed live), 0x263368 (2D default states), then the full-screen quad 0x5C72A8 textured with the screen raster, then back. So "render into C" is just a camera switch; no new raster or Initialise patch is needed (RE target 3b is not needed for P3).
+- Screen W/H `[0x5B8530]/[0x5B8534]` = 640/480.
+- `pe_bRadiosity` → `atoi != 0` → byte `0x5F4B1C` (handler 0x1580C7; tokens split on `" ,\t"`). `devkit_memory` sets the same memory global as `memory` (0x39F334 = v<<10) plus a "devkit" flag that makes later `memory` lines ignored; in the Xbox ini both are 38000.
+- **PS2 `m_bRadiosity` = `$gp+0x1658` = 0x66CEC8** (INIT.NM stream.ini handler `sb $v0, 0x1658($gp)` at 0x895C20, next to `pe_bottomy` at `$gp−0x2B3C`). Live: 1, read every frame.
+
+**P3 as built (`patches/p3_radiosity.py` → `.json`, 978 of 1413 B):** SkyGfx's fixed-function PS2 radiosity (`postfx.cpp CPostEffects::Radiosity` @926616a3), on the two Xbox surfaces:
+1. `0x24BB7B`: C = F (the filtered frame).
+2. Downsample ×filterPasses, SkyGfx geometry (src [UC+0.5, dw+0.5] → dst [0, dw/2+1], LINEAR), ping-pong C → backbuffer corner (scene camera) → C strip x ≥ 640 (postfx camera; that strip is never on screen).
+3. Highlight `2D − L` = stage-0 `ADDSIGNED2X` (9) with vertex grey d = 128 − L·128/255, merged into the last hop when it lands in C, else a 1:1 hop (odd filterPasses; no stock caller).
+4. Restore the backbuffer 1:1 from C, then add the (dw+1)-texel highlight stretched to full screen: LINEAR, SRCALPHA/ONE, A = intensity (/255), ×renderPasses. filterPasses 0 (darkness filter): highlight inside the 1:1 composite.
+5. COLOROP back to 4, `0x24BB7B` again (C = final frame, SkyGfx UpdateFrontBuffer), stock tail states.
+- Self-check (`--selftest`): code fits, disassembles fully, calls only 0x24BB7B / camera begin/end / its own draw helper, one Im2D draw site; `model()` = the same operator in numpy (analytic flat-frame and single-dot cases).
+
+**PS2 reference (Grove St 12:00, weather 0, software renderer 1×, `m_bRadiosity` toggled live):**
+- Hypothesis: SkyGfx's PS2 path with the timecyc limit and /255 reproduces the PS2 bloom (H4: /255 vs /128). Prediction: `model(ps2_off, L, 2, I)` ≈ `ps2_on` with best fit at the Xbox's live limit (180) and 35.
+- Result: PS2 on − off mean +4.8/+5.5/+4.5 (repeatable, on/on MAE 0.8). Grid fit over L ∈ {140…220}, I ∈ {25, 35, 50, 70}: **best L = 180, I = 35: MAE 1.02, bias −0.02/0.00/−0.01** (no radiosity: MAE 6.01). /128 (I 70) is clearly worse. UC/VC 2 beats 0 and 1 (MAE 1.02 vs 1.58/1.27). The residual is unstructured scanline noise (PS2 448 → 480 display resample; modelling it gives 0.94).
+- Night (00:00, limit 90): the PS2 bloom is tiny (+0.14/+0.32/+0.07); model(90, 35) bias ≈ 0, MAE 0.167 vs 0.222 with no radiosity (consistent, weak signal).
+- **Verdict: H4 Confirmed = /255 [C for these scenes].** The PS2 radiosity operator is SkyGfx's, with the timecyc limit and the stock 35.
+- Harness: the **idle camera** (CIdleCam) starts panning after CJ is left idle, on both consoles, even at timescale 0 (it made the first PS2 night set unusable). Nudge the player, then capture quickly.
+
+**E6, Xbox live RAM test (`work/session_tools/p3live.py`; `gtasa_p2p5.xiso` session, brightness 256 = identity ramp, timescale 0):** P3 poked into 0x24DF8E, `0x5F4B1C` toggled. Deterministic check: capture vs `model(flag-off frame, …)`. The HUD boxes and moving pixels (dilated 16 px) are masked, because the HUD is drawn after PostFX and the model would bloom it.
+
+| Path | Scene / args | kept | P3 − off mean | vs model MAE | within ±2 |
+|---|---|---|---|---|---|
+| filterPasses 2 (highlight merged) | noon, 180/2/35/1 | 75.6 % | +8.4/+7.4/+4.5 | 0.08/0.20/0.02 | **100 %** |
+| (same, model without UC/VC) | | | | 1.28/1.47/0.72 | 79.4 % |
+| filterPasses 2 | midnight, 90/2/35/1 | 72.7 % | +0.3/+0.4/+0.2 | 0.02/0.03/0.01 | **100 %** |
+| filterPasses 0 (darkness filter forced via `0x5F4B14` = 1, darkness alpha 170) | 45/0/255/2 | 89.8 % | +0.5/+0.8/+0.3 | 0.04/0.06/0.02 | **100 %** |
+
+- The HUD is intact, with no edge or strip artefacts; the game keeps running (GDB responsive, frames repeatable to MAE 0.15). `ADDSIGNED2X` = 9 and drawing at x ≥ 640 in the postfx camera are confirmed by the 100 % match.
+- **Verdict: E6 Confirmed**: P3 draws exactly the PS2 (SkyGfx) radiosity on the Xbox.
+- Fidelity vs PS2 at noon (content classes; framing differs): **sky ΔE 6.8 → 3.9** (the "noon sky" residual after P1 + gamma is mostly radiosity). Ground ΔE 8.1 → 10.6 and frame 3.8 → 6.6 get worse, because the Xbox ground is already brighter than the PS2's *before* radiosity (142/106/56 vs PS2 no-radiosity 121/86/42) and the bloom grows with it. Since the operator matches, that gap is upstream (building/ground lighting, H5/P4, or framing) [H].
+- **Build:** `dist/default_p2p3p5.xbe` (P2 + P3 + P5; sha1 d7e1d28c…) → `work/xbox/gtasa_p2p3p5.xiso` (a copy of `gtasa_p2p5.xiso`, both regions verified before the write). The embedded `stream.ini` is pe 8 + `devkit_memory\t38000\r\n` → `pe_bRadiosity\t\t\t\t\t1\r\n` (same 21 B, file stays 197 B; a copy is at `work/xbox/stream_pe8_rad.ini`). Boot test pending.
+- **P3 boot test (2026-09-24) [C]:** `gtasa_p2p3p5.xiso` boots and the save loads (slot 1, now a copy of slot 2 re-saved with brightness 256). Live (`work/session_tools/p3boot.py`):
+  - All P2, P3 and P5 bytes equal the JSONs.
+  - pe 8 ×4; `0x5F4B1C` = 1 read from the ISO's `stream.ini`; memory 38000 (the `devkit_memory` swap is harmless); brightness 256 → identity ramp.
+  - Grove St 12:00, limit 180, c1 66,66,48,a254, c2 166,129,60,a254: P3 vs `model(flag-off frame, 180)` = **100 % within ±2** (MAE 0.08/0.22/0.02; 66.2 % kept after masking the HUD, radar and phone help box, dilated 16 px, plus CJ's phone animation, his shadow and a pedestrian). The first pass (95.9 %) left the help box and the later animation unmasked.
+  - Overlays drawn after PostFX are unchanged. Side-by-side for sign-off: `captures/grove_noon_p3boot/_signoff_grid.png`.
+- **P3 pause-menu check (2026-09-24) [C]:** with the pause menu up, breakpoints at 0x24DF8E (radiosity) and 0x24C537 (PostFX Render) never hit within 3 s. Captures with `0x5F4B1C` = 1 / 0 / 1: **0 pixels differ** (`captures/pause_menu_p3/`).
+- **Visual sign-off (2026-09-24):** the user accepted P3 against the PS2 (`_signoff_grid.png`). **Phase 4 is closed**; v0.3 candidate = `gtasa_p2p3p5.xiso`.
+
+## 2026-09-24 — P3 interior check (CJ's house, both consoles, 12:00)
+
+- Setup: `gtasa_p2p3p5.xiso` (slot 1), the user walked CJ into his house on both consoles (Xbox (2495.5, −1702.3, 1014.7) area 3; PS2 (2495.8, −1701.6, 1014.7)), clocks 12:00, then `timescale 0`. ColourFilter args c1 64,64,64,a128, c2 64,64,64,a254 (neutral). Files: `captures/cj_house_p3/`.
+- **Interior radiosity limit `[0x6C88DC]` = 0 [C]**: every pixel passes, so H = clip(2D) and the bloom is a relative gain (≈ +27 % of 2D·35/255).
+- PS2 radiosity on/off (55 % static px): on − off +5.3/+4.4/+3.9. Grid fit: **best L = 0, I = 35** (MAE 1.43, bias −0.6), next L = 10. So the PS2 uses the same interior limit 0 [C].
+- Xbox P3 vs `model(off, 0)`: **100 % within ±2** (MAE 0.11; 71 % kept); P3 − off = +10.8/+9.5/+8.5.
+- Same relative bloom on both consoles: blue wall 108 → 133 (PS2, ×1.23) vs 122 → 155 (Xbox, ×1.27); window +33 on both.
+- **The absolute gap is upstream of P3 [C for this frame]:** before radiosity, the Xbox interior is already brighter in the shadows (median luminance 18 vs 8; floor 18/11/7 vs 6/1/0; mean 33.4 vs 27.7), matching the earlier "PS2 has much deeper shadows" interior result. At L = 0 radiosity scales that gap by ~1.3× (mean 35.0 PS2 vs 42.6 Xbox P3).
+- **Consequence for Phase 5 [H]:** in this interior the Xbox is brighter in the darks than the PS2. That is the *opposite* of H5 (PS2 building ambient ×2 → brighter PS2 shadows, from the night-asphalt residual). P4 must be tested in both directions: interiors may use a different pipe/prelight path (the 11:11:10 night/day prelight packing, or a missing PS2 darkening), rather than a plain ambient ×2.
