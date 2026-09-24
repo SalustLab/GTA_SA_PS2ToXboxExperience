@@ -7,6 +7,7 @@ Usage:
   py tools/xemu_gdb.py filter                       print c1/c2 at 0x6C88B8 (predict_filter.py args)
   py tools/xemu_gdb.py teleport <x> <y> <z> [heading_rad]
   py tools/xemu_gdb.py timescale <f>                CTimer::ms_fTimeScale; 0 freezes the world, rendering continues
+  py tools/xemu_gdb.py idlecam off|on               CIdleCam kick-in time 1e30 / stock 90000 ms (idle pan + HUD hide)
   py tools/xemu_gdb.py capture <out.png>            PrintWindow of the xemu window (works when covered), 2x box-reduced
   py tools/xemu_gdb.py --cxbx <command ...>         same commands on Cxbx-Reloaded via process memory (no filterargs)
   py tools/xemu_gdb.py --selftest
@@ -26,6 +27,7 @@ POSTFX_COLOURS = 0x6C88B8              # 8 floats: c1 rgba, c2 rgba (alpha alrea
 PLAYERS = 0x6C8F18                     # CWorld::Players[0].m_pPed
 COLOURFILTER_CALL = 0x24CAF5           # call CPostEffects::ColourFilter(c1, c2); args = packed RGBA bytes
 TIME_SCALE = 0x56B9AC                 # CTimer::ms_fTimeScale [S] (savegame field order), freeze tested live
+IDLECAM_KICKIN = 0x6C5270             # gIdleCam 0x6C5248 +0x28: ms without input before the idle cam [C] (Init 0xD271F)
 
 
 def capture(path, title_prefix="xemu |"):
@@ -192,6 +194,8 @@ def run(g, args):
         return " ".join(str(v) for v in c1 + c2)
     elif op == "timescale":
         g.write(TIME_SCALE, struct.pack("<f", float(args[1])))
+    elif op == "idlecam":
+        g.write(IDLECAM_KICKIN, struct.pack("<f", 90000.0 if args[1] == "on" else 1e30))
     else:
         raise SystemExit(__doc__)
     return "ok"
@@ -248,6 +252,8 @@ def selftest():
     assert struct.unpack_from("<f", mem, ped + 0x558)[0] == 1.5
     run(g, ["timescale", "0"])
     assert struct.unpack_from("<f", mem, TIME_SCALE)[0] == 0.0
+    run(g, ["idlecam", "off"])
+    assert struct.unpack_from("<f", mem, IDLECAM_KICKIN)[0] > 1e29
     g.detach()
     print("xemu_gdb selftest OK")
 

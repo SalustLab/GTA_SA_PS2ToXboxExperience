@@ -455,3 +455,58 @@ Symbols come from the Cxbx-Reloaded symbol cache (`E:\Emuladores\Cxbx-Reloaded\S
 - Same relative bloom on both consoles: blue wall 108 → 133 (PS2, ×1.23) vs 122 → 155 (Xbox, ×1.27); window +33 on both.
 - **The absolute gap is upstream of P3 [C for this frame]:** before radiosity, the Xbox interior is already brighter in the shadows (median luminance 18 vs 8; floor 18/11/7 vs 6/1/0; mean 33.4 vs 27.7), matching the earlier "PS2 has much deeper shadows" interior result. At L = 0 radiosity scales that gap by ~1.3× (mean 35.0 PS2 vs 42.6 Xbox P3).
 - **Consequence for Phase 5 [H]:** in this interior the Xbox is brighter in the darks than the PS2. That is the *opposite* of H5 (PS2 building ambient ×2 → brighter PS2 shadows, from the night-asphalt residual). P4 must be tested in both directions: interiors may use a different pipe/prelight path (the 11:11:10 night/day prelight packing, or a missing PS2 darkening), rather than a plain ambient ×2.
+
+## 2026-09-24 — Harness: idle camera disabled on both consoles
+
+- After 90 s with no pad input, `CIdleCam` hides the HUD and radar and pans to nearby peds. It does this even at `timescale 0`. It spoiled several capture sets, including the HUD-less Xbox noon frames and PS2 frames aimed at a pedestrian.
+- Xbox [C]: `CIdleCam::Init` 0xD271F is called once, from the static initializer 0x2D55F3, with `gIdleCam` = **0x6C5248**. Init writes the kick-in time 90000.0 ms to +0x28, so the float is at **0x6C5270** (live 90000.0).
+- PS2 [C]: the same layout sits at **0x6FFE20**, found by searching the savestate RAM for 2000.0 at +0x14, 1.0 at +0x24, 90000.0 at +0x28 and 5000.0 at +0x38. The kick-in float is at **0x6FFE48**.
+- Live test on both consoles: kick-in 3000 → idle mode starts within 7 s (the HUD vanishes, then the camera pans). 1e30 → it exits and does not come back.
+- New harness command on both consoles: `xemu_gdb.py idlecam off|on` and `pcsx2_pine.py idlecam off|on`. `off` writes 1e30 and lasts until the emulator reboots. It is in the CLAUDE.md capture rules and in the session capture scripts.
+- Other harness additions this session:
+  - `work/session_tools/ps2dump.py`: full PS2 RAM through a PINE savestate (slot 9) plus `eeMemory.bin` extraction. The .p2s is a zip with zstd entries, decoded with the zstd bundled with Poppler.
+  - `trace.py`-style breakpoint loggers must remove the breakpoint, single-step and re-insert it on every hit. A plain `c` from a software breakpoint re-reports the same hit forever (RF set, no progress). That explains the earlier "building constant uploads 0x166E26 do not fire" note, which is wrong: they fire every frame.
+
+## 2026-09-24 — Phase 5: RE target 5 (building lighting) + H5 test + P4 (E7)
+
+**RE target 5 — the Xbox building lighting path [C]:**
+- The building pipes upload their constants with plain `SetVertexShaderConstant1/4` calls, not inline push-buffer writes; the earlier 400-hit log only ever saw Im2D because of the tracer bug above. The per-frame setup functions are 0x166C70 (VS `[0x5F291C]`), 0x1675DF (DN pipe 0x53F20096, VS `[0x5F2928]`/`[0x5F292C]`) and 0x16A1E5. 0x16A1E5 is shared by the building VS `[0x5F2934]`/`[0x5F2940]` and by the vehicle VS `[0x5F2960]` and the unlit VS `[0x5F2984]`.
+  - They upload: c0–c3 the transform; c13 the directional light and c15 the **ambient light**, each `min(RpLight colour, 1)` from pDirect `[0x5F4C00]` and pAmbient `[0x5F4BFC]`; c23 = (DN balance `[0x3C9DA4]` or `[0x3C9B10]`, 1−b); c32 = (0, 1, 0.5, 2).
+  - Per material, 0x166EE3 uploads c20/c21/c22 from the D3DMATERIAL at 0x3D26C0, filled by 0x16AFAD: c20 = matCol·surfDiff, c21 = matCol·surfAmb.
+- NV2A decoder (xemu vsh.c layout). All 8 building VS blobs (0x3C9B18, 0x3C9C00, 0x3C9DA8, 0x3C9E90, 0x3C9FB8, 0x3CA060, 0x3CA1C8, 0x3CA270) share one lighting core: **`oD0.rgb = (v1·c23.x + v2·c23.y)·c20 + c15·c21`**, clamped to [0, 1]. This is SkyGfx's `xboxBuildingVS`, exactly.
+  - Declaration 0x3D25E0: v1 = NORMPACKED3 night colours (weight b), v2 = D3DCOLOR day colours (weight 1−b).
+  - The blobs from 0x3CA480 on also light with c13/c16 (directional) and c14/c22 (specular). They are vehicle/ped shaders.
+- The DN balance is a pure function of the clock (0x168918 via 0x11028D; setter 0x168824 clamps to [0, 1]). It is 0 at 12:00 and 1 at 00:00.
+- pAmbient for buildings is `SetAmbientColours` 0x26409A → `AmbientLightColourForFrame` 0x5ECCC8 = timecyc ambient / 255 (A/255 exactly, live). The timecyc current colour set is at 0x6C8840. The ambient tables, laid out [hour][weather] u8, are at Xbox **0x56B8B8 / 0x56B800 / 0x56B748** (R/G/B) and PS2 **0x7073F0 / 0x7074B0 / 0x707570**.
+- Interior (CJ's house, 12:00): c15 = 0, c13 = 0, DN = 0, so the Xbox interior is exactly `tex·day prelight·matCol`. Forcing D3D fog off (0x361872 `je`→`jmp`) changes 2.7 % of pixels by +0.02, so **fog is refuted** as the source of the interior dark gap. Forcing DN to 0.5 or 1 moves the Xbox away from the PS2 (the night set has brighter darks), so **the DN hypothesis is refuted**.
+
+**H5 test (ambient sweep on both consoles, radiosity off, Grove St, weather 0; `work/session_tools/p4amb.py`):** timecyc ambient forced to A on every hour slot, then ΔOut = Out(A) − Out(0) per console.
+- Frame means: PS2/Xbox ΔOut = **1.74–1.84** at 00:00 (A 64/128) and **1.73** at 12:00 (A 32).
+- Registered facade, per pixel, 00:00: ambient term PS2/Xbox **1.78** (IQR 1.63–1.93); night-prelight term (A0) **0.75** for R and G. B is not usable: tiny values, and the PS2 darks are quantized in steps of 4.
+- Texture-free ratio (P/g)PS2 / (P/g)Xbox, where the texture cancels per pixel: **0.47–0.54 at noon**, against 0.502 predicted by SkyGfx (prelight ×1, ambient ×255/128). At night it is 0.41.
+- **Verdict: H5's mechanism is confirmed.** Relative to prelight, the PS2 adds the building ambient at ~2× the Xbox. **H5's prediction** ("doubling the ambient closes the dark gap") **is refuted**: the PS2 prelight term is also *weaker*, about 0.87× (day set) and 0.75× (night set) in absolute frame terms [S]. Whether that shared ~0.87 comes from lighting or textures is open [H]. The interior "PS2 darker in the darks" fits the same ~0.85–0.9 prelight factor (Xbox 96–200 → PS2 ×0.85–0.9; darks lower still).
+
+**P4 (`patches/p4_building_ambient.py` → `.json`) [built]:** c15 × 2 on the building pipes only.
+- A VS-operand edit (`mov r, c15` → `add r, c15, c15`) is **not possible**. In every blob that `mov` is paired with an ILU `mov oT0/oD0.w, …` that reads operand C. The first try broke the texture coordinates live: darker facade, lit windows.
+- As built, the three 86-byte clamp blocks are rewritten in place (65 B each):
+  - `c15 = minps(pAmbient, 1)`, then xyz doubled and w kept (the vehicle VS reads c15.w);
+  - 0x166D91 and 0x167700 (building-only setups) are always doubled;
+  - 0x16A30A (shared) is doubled only if RW's current VS `[0x3D4750]` is `[0x5F2934]` or `[0x5F2940]`.
+- The selftest checks the stock block pattern, fit, full disassembly, that eax (pDirect) and xmm4 (1.0) are preserved, and that only the shared block carries the check.
+- **E7 live (RAM, 00:00, A 0/64):** A0 frame P4 vs stock mean|d| **0.014**. Ambient response **2.00×** per pixel (IQR 1.98–2.03). PS2/Xbox ambient ratio 1.74–1.81 (stock) → **0.87–0.91** (P4).
+- c15 log with P4 on:
+  - building DN 0.1725 = 2 × 0.0863;
+  - unlit `[0x5F2984]` 0.0863 and vehicle `[0x5F2960]` (0.189, 0.182, 0.112): not doubled [C];
+  - building `[0x5F2940]` gets 0 on stock as well.
+- **E7 verdict: the mechanism is confirmed**. P4 does exactly what it should to the ambient term.
+- **Natural-scene fidelity (`p4fid.py`, radiosity as shipped, idle cam off) — P4 makes things worse:**
+
+| Grove St, frame mean (median lum) | PS2 | Xbox stock | Xbox + P4 |
+|---|---|---|---|
+| 00:00 | 37/47/30 (37.3) | 36/44/29 (35.0) | 50/63/44 (53.7) |
+| 12:00 | 111/84/47 (89.3) | 120/102/63 (104.0) | 131/102/63 (108.0) |
+
+  - At night the stock total already matches the PS2. The sweep model predicts the PS2 night R mean at 0.75·25.5 (prelight) + 1.78·10.8 (ambient) = 38.3, against 37.4 measured, and P4 alone at 47 (49.6 measured).
+  - **Conclusion:** P4 as planned (ambient ×2) must not ship alone. A faithful P4 needs ambient ×~1.75 **and** prelight ×~0.87 (day) / ×~0.75 (night), which is a 2-parameter model. Or skip P4, since the PS2/stock totals already agree at night.
+  - Build for A/B only: `dist/default_p2p3p4p5.xbe` (sha1 b38df22e…). Not boot-tested; no ISO made.
+- **Decision (user, 2026-09-24): option (a), the 2-parameter P4.** Next session starts with the texture check (PS2 vs Xbox TXD for a Grove St facade texture), then the refit and the building-pipe-only implementation. The step list is in PLAN §18 "Next session plan (P4 v2)".

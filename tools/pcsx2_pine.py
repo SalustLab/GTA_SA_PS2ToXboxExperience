@@ -5,6 +5,7 @@ Usage:
   py tools/pcsx2_pine.py weather <id>                           Old=New=Forced=id
   py tools/pcsx2_pine.py teleport <x> <y> <z> [heading_rad]     player ped (or its vehicle) matrix position
   py tools/pcsx2_pine.py timescale <f>                          CTimer::ms_fTimeScale; 0 freezes the world
+  py tools/pcsx2_pine.py idlecam off|on                         CIdleCam kick-in time 1e30 / stock 90000 ms
   py tools/pcsx2_pine.py where                                 player position + ped floats (heading search)
   py tools/pcsx2_pine.py capture <out.png> [title]              PrintWindow of the PCSX2 game window
   py tools/pcsx2_pine.py --selftest
@@ -20,6 +21,7 @@ MS_PER_GAME_MINUTE = 0x66BF1C
 WEATHER_OLD, WEATHER_NEW, WEATHER_FORCED = 0x66C4A4, 0x66C4A8, 0x66C4AC
 PLAYERS = 0x70A160                      # CWorld::Players[0].m_pPed (stride 0x1BC)
 TIME_SCALE = 0x66C1A8                   # CTimer::ms_fTimeScale (0x938($gp)); 0 stops the clock, tested live
+IDLECAM_KICKIN = 0x6FFE48               # gIdleCam 0x6FFE20 +0x28 (same layout as Xbox 0x6C5248) [C], tested live
 PED_HEADING = (0x598, 0x59C)          # current, aiming [S]: Xbox +0x558/+0x55C shifted by 0x40 like m_pVehicle
 
 READ8, READ32, WRITE8, WRITE16, WRITE32 = 0, 2, 4, 5, 6
@@ -84,6 +86,8 @@ def run(p, args):
                 p.write(ped + o, struct.pack("<f", float(args[4])))
     elif op == "timescale":
         p.write(TIME_SCALE, struct.pack("<f", float(args[1])))
+    elif op == "idlecam":
+        p.write(IDLECAM_KICKIN, struct.pack("<f", 90000.0 if args[1] == "on" else 1e30))
     elif op == "where":
         ped, ent = player_entity(p)
         mat = p.u32(ent + 0x14)
@@ -133,6 +137,8 @@ def selftest():
     assert struct.unpack_from("<3f", mem, mat + 0x30) == (2489.25, -1667.0, 13.25)
     assert struct.unpack_from("<2f", mem, ped + PED_HEADING[0]) == (-1.5, -1.5)
     assert "pos=(2489.25, -1667.00, 13.25)" in run(p, ["where"])
+    run(p, ["idlecam", "off"])
+    assert struct.unpack_from("<f", mem, IDLECAM_KICKIN)[0] > 1e29
     print("pcsx2_pine selftest OK")
 
 

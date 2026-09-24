@@ -43,7 +43,7 @@ There is no build system, linter or test suite. Each script has an assert-based 
 | `tools/xbe_patch.py <in.xbe> <out.xbe> <patch.json…>` | Applies patch JSONs. Refuses a wrong input SHA1, BSS targets, overlaps, and any original-byte mismatch. Also refuses to overwrite its input or to write into the originals. |
 | `tools/predict_filter.py` | Expected PS2 or Xbox colour-filter output for a postfx-off frame plus c1/c2. |
 | `tools/compare.py captures/<scene>` | PLAN §16 metrics. The reference is `ps2.png` and every other `*.png` is a variant. Writes `metrics.json` and `_diff_*.png`. Files starting with `_` are ignored as inputs. |
-| `tools/xemu_gdb.py <cmd>` | Live Xbox pokes and captures through the xemu GDB stub (port 1234): `clock`, `weather`, `postfx`, `filter`, `teleport`, `timescale`, `capture`. Add `--cxbx` to target Cxbx-Reloaded. |
+| `tools/xemu_gdb.py <cmd>` | Live Xbox pokes and captures through the xemu GDB stub (port 1234): `clock`, `weather`, `postfx`, `filter`, `teleport`, `timescale`, `idlecam`, `capture`. Add `--cxbx` to target Cxbx-Reloaded. |
 | `tools/pcsx2_pine.py <cmd>` | The same for PS2 through PCSX2 PINE (port 28011). |
 | `tools/ps2_cheats.pnach` | Alternative PS2 clock and weather freeze. Install instructions are in its header. |
 
@@ -59,7 +59,8 @@ There is no build system, linter or test suite. Each script has an assert-based 
 - Captures go to `captures/<scene>/<variant>.png`, with `ps2.png` as the reference. After each experiment, add a dated entry to `docs/findings.md`: hypothesis, prediction, result, and Confirmed or Refuted. Update the PLAN §18 status when a phase moves.
 - **Gamma:** xemu applies the game's brightness gamma ramp at display, which can make captures `fb^0.843`. Read the active ramp (findings.md, "Residual k2 = display gamma") and linearize before any per-pixel comparison.
 - The xemu menubar covers the top ~12 rows of captures, so mask rows < 14.
-- Freeze the scene first: clock, weather, teleport and `timescale 0`.
+- Freeze the scene first: clock, weather, teleport, `timescale 0` and `idlecam off` on **both** consoles.
+- `idlecam off` is required. After 90 s with no pad input the idle camera (`gIdleCam` +0x28 kick-in time: Xbox `0x6C5270`, PS2 `0x6FFE48`) hides the HUD and pans to nearby peds, even at `timescale 0`. `off` writes 1e30; it lasts until the emulator reboots. `on` restores 90000.
 - PS2 reference captures must use the software renderer, or Blending Accuracy = Maximum, at native 1×. Otherwise PS2 radiosity blending is emulated wrong.
 
 ## Environment

@@ -1,0 +1,26 @@
+{
+  "name": "P4 PS2 building ambient (c15 x2 in the building pipe setups)",
+  "patches": [
+    {
+      "va": "0x166d91",
+      "orig_sha1": "68e4bb9eeb17a431c3f648042ec97f128f7b2db4",
+      "len": 86,
+      "new": "8b0dfc4b5f000f1041180f28d40fc6d2000f5dc20f1145540f58c00f1345540f15c0f30f11455ceb2dcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "note": "c15 = min(pAmbient,1), xyz x2"
+    },
+    {
+      "va": "0x167700",
+      "orig_sha1": "68e4bb9eeb17a431c3f648042ec97f128f7b2db4",
+      "len": 86,
+      "new": "8b0dfc4b5f000f1041180f28d40fc6d2000f5dc20f1145540f58c00f1345540f15c0f30f11455ceb2dcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "note": "c15 = min(pAmbient,1), xyz x2"
+    },
+    {
+      "va": "0x16a30a",
+      "orig_sha1": "8a8392f2279c9bce3888592a86a403b29f7a97c6",
+      "len": 86,
+      "new": "8b0dfc4b5f000f1041180f28d40fc6d2000f5dc20f1145e08b1550473d003b1534295f00740a3b1540295f007402eb0f0f58c00f1345e00f15c0f30f1145e8eb15cccccccccccccccccccccccccccccccccccccccccc",
+      "note": "c15 = min(pAmbient,1), xyz x2 if RW VS is a building one"
+    }
+  ]
+}
