@@ -27,7 +27,95 @@ XBE = Path(__file__).resolve().parents[1] / "work" / "xbox" / "default.xbe"
 BLUR_ENABLE = 0x3CE7AD                     # .data byte, 1 in the stock XBE; gates the blur pass 0x24ECAA
 
 
-def build(k=1.0):
+PE_OFFSETS = 0x3CE808                      # int left, top, right, bottom (stream.ini pe_leftx..; PS2 8, Xbox 16)
+QUAD = 0x5C7318                            # 4 Im2D verts, stride 28, UV at +0x14/+0x18: v0 TL, v1 BL, v2 BR, v3 TR
+
+
+def _pass2(blur):
+    """Pass 2 draw. blur (P2): LINEAR + a stack copy of the quad with UVs shifted by pe/16 texels (PS2 fb')."""
+    if not blur:
+        return """
+        add esp, 0x10
+        lea esi, [ebp + 0xc]
+        mov dl, byte ptr [ebp + 0xf]
+        call pack_draw                      # pass 2: c2*S, A=a2"""
+    shifts = ""                             # SkyGfx corners: left v0,v1; top v0,v3; right v2,v3; bottom v1,v2
+    for i, (a, v, uv) in enumerate([(0, (0, 1), 0x14), (1, (0, 3), 0x18), (2, (2, 3), 0x14), (3, (1, 2), 0x18)]):
+        p, q = (8 + n * 28 + uv for n in v)
+        shifts += f"""
+        fild dword ptr [{PE_OFFSETS + 4 * a:#x}]
+        fidiv dword ptr [esp + {4 * (i & 1)}]   # / (16 * raster w|h)
+        fld dword ptr [esp + {p}]
+        fadd st(0), st(1)
+        fstp dword ptr [esp + {p}]
+        fadd dword ptr [esp + {q}]
+        fstp dword ptr [esp + {q}]"""
+    return f"""
+        push 2
+        push 9
+        call edi           # filter LINEAR (pass 2 only)
+        add esp, 0x18
+        lea esi, [ebp + 0xc]
+        mov dl, byte ptr [ebp + 0xf]
+        call pack                           # c2*S, A=a2 into the quad
+        sub esp, 0x70
+        push edi
+        mov esi, {QUAD:#x}
+        lea edi, [esp + 4]
+        push 0x1c
+        pop ecx
+        rep movsd dword ptr es:[edi], dword ptr [esi]   # quad -> stack; the original stays unshifted for next frame
+        pop edi
+        mov eax, dword ptr [0x5f4b28]       # copy raster: RwRaster width +0xC, height +0x10
+        mov ecx, dword ptr [eax + 0xc]
+        shl ecx, 4
+        mov edx, dword ptr [eax + 0x10]
+        shl edx, 4
+        push edx
+        push ecx                            # [esp] 16w, [esp+4] 16h, quad copy at esp+8{shifts}
+        lea eax, [esp + 8]
+        call draw
+        add esp, 0x78"""
+
+
+def _helpers(blur, s):
+    pack = f"""
+    pack:                                   # esi -> R,G,B bytes, dl = alpha
+        movzx edx, dl
+        mov ecx, 3
+    chan:
+        shl edx, 8
+        movzx eax, byte ptr [esi]
+        imul eax, eax, {s}
+        add eax, 0x80                       # round, don't truncate
+        shr eax, 8
+        or edx, eax
+        inc esi
+        loop chan
+        mov dword ptr [0x5c7328], edx
+        mov dword ptr [0x5c7344], edx
+        mov dword ptr [0x5c7360], edx
+        mov dword ptr [0x5c737c], edx"""
+    draw = """
+        push 6
+        push 0x3ce82c
+        push 4
+        push {verts}
+        push 3
+        call dword ptr [0x75de94]           # Im2DRenderIndexedPrimitive
+        add esp, 0x14
+        ret"""
+    if not blur:                            # P1 layout, byte-identical to the v0.1 build
+        return pack.replace("pack:", "pack_draw:") + draw.replace("{verts}", "0x5c7318")
+    return f"""
+    pack_draw:
+        call pack
+        mov eax, {QUAD:#x}
+    draw:                                   # eax -> 4 Im2D verts{draw.replace("{verts}", "eax")}{pack}
+        ret"""
+
+
+def build(k=1.0, blur=False, start=START, end=END):
     mult, op = (2, 5) if k >= 1 else (4, 6)   # MODULATE2X is exact for k = 1; 4X only to compensate k < 1
     s = round(256 * 2 / (mult * k))         # colour scale, fixed point /256 (256 = colour as-is)
     asm = f"""
@@ -76,10 +164,7 @@ def build(k=1.0):
         push 2
         push 0xb
         call edi           # dst ONE
-        add esp, 0x10
-        lea esi, [ebp + 0xc]
-        mov dl, byte ptr [ebp + 0xf]
-        call pack_draw                      # pass 2: c2*S, A=a2
+{_pass2(blur)}
         mov dword ptr [0x36bbf8], 4         # restore MODULATE
         or dword ptr [0x36e280], 0x800
         push 2
@@ -106,35 +191,12 @@ def build(k=1.0):
         pop ebx
         pop ebp
         ret
-    pack_draw:                              # esi -> R,G,B bytes, dl = alpha
-        movzx edx, dl
-        mov ecx, 3
-    chan:
-        shl edx, 8
-        movzx eax, byte ptr [esi]
-        imul eax, eax, {s}
-        add eax, 0x80                       # round, don't truncate
-        shr eax, 8
-        or edx, eax
-        inc esi
-        loop chan
-        mov dword ptr [0x5c7328], edx
-        mov dword ptr [0x5c7344], edx
-        mov dword ptr [0x5c7360], edx
-        mov dword ptr [0x5c737c], edx
-        push 6
-        push 0x3ce82c
-        push 4
-        push 0x5c7318
-        push 3
-        call dword ptr [0x75de94]           # Im2DRenderIndexedPrimitive
-        add esp, 0x14
-        ret
+{_helpers(blur, s)}
     """
-    code, _ = Ks(KS_ARCH_X86, KS_MODE_32).asm(asm, START)
+    code, _ = Ks(KS_ARCH_X86, KS_MODE_32).asm(asm, start)
     code = bytes(code)
-    assert len(code) <= END - START, f"{len(code)} bytes > {END - START}"
-    return code + b"\xcc" * (END - START - len(code)), s
+    assert len(code) <= end - start, f"{len(code)} bytes > {end - start}"
+    return code + b"\xcc" * (end - start - len(code)), s
 
 
 if __name__ == "__main__":

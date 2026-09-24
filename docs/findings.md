@@ -368,3 +368,34 @@ Symbols come from the Cxbx-Reloaded symbol cache (`E:\Emuladores\Cxbx-Reloaded\S
   - It starts `push ebp; mov ebp,esp; sub esp,0x28; cmp byte [0x3CE7AD],0; …; je 0x24EE9F`, and its only known call is at 0x24CC89. Not checked yet: whether other callers exist.
   - Alternative: 34 free bytes left in P1's 300-byte ColourFilter slot. That is too small for UV shift + restore.
 - **P2 requirements:** pass 2 only, texture filter LINEAR (RwRenderStateSet 9 = 2), then back to NEAREST. The UVs must be restored after the draw (0x5C7318 persists across frames, so shifts would accumulate).
+
+## 2026-09-24 — P2 filter blur: built, live RAM test and E5 (Grove St 12:00, SUNNY_LA)
+
+- **Hypothesis:** the PS2 softness is pass 2 of the colour filter sampling fb′ with LINEAR filtering at +pe/16 texels (pe = 8 → +0.5 texel, a 2×2 box). **Prediction:** the patched frame matches `predict_filter.predict(raw, c1, c2, shift=(0.5, 0.5))` within ±2 levels, and its Laplacian variance moves from P1's value to the PS2's.
+- **Cave [C]:** the Xbox blur pass 0x24ECAA–0x24EEA1 (504 B) has exactly one reference, `call` at 0x24CC89 (rel32 scan of every section; no absolute pointers). The caller pops the two args itself, so NOP-ing the call is equivalent to P1's blur byte = 0.
+- **P2 as built (`patches/p2_filterblur.py` → `.json`):** P1 plus blur is 439 B, which does not fit P1's 300 B slot. P2 is therefore self-contained and **supersedes P1**. `xbe_patch.py` refuses P1 + P2 because both patch 0x24F007.
+  - `0x24F007`: `jmp 0x24ECAA`. Every caller lands in the new body, with the stack and ABI unchanged.
+  - `0x24CC89`: the blur-pass call becomes 5 × NOP.
+  - `0x24ECAA`: P1's code (`p1_colourfilter.build(blur=True)`, which emits the same bytes as v0.1 when `blur=False`; the selftest asserts this) plus, for pass 2: filter LINEAR, a stack copy of the quad 0x5C7318, and UVs += `pe/(16·rasW|rasH)`. The raster size is read from the copy raster, where RwRaster width/height sit at +0xC/+0x10 = 1024/512 [C]. The persistent quad is never modified.
+  - Unlike SkyGfx, no `W/640`, `H/448` scale is applied: the Xbox renders 640×480 natively, and the PS2 meaning of the value is pe/16 of a framebuffer pixel.
+- **PS2 pe globals [C]:** `0x668D28..0x668D34` (`$gp` − 0x2B48): 8, 8, 8, 8, followed by 1.0, 1.0, 0.0008 (`pe_lightchangerate`) and 0.35 (`pe_lightingbasecap`). Found by a batched PINE scan of $gp ± 32 KB. Poking them to 0 visibly sharpens the PS2 image, so they are read every frame.
+- **Live RAM test (xemu, P1+P5 session, brightness 256 = identity ramp, timescale 0):** c1 66,66,48,a254, c2 166,129,60,a254. The mask drops rows < 14, the last 2 rows/columns, moving pixels and the HUD (91.9 % of the frame kept). Files: `captures/grove_noon_p2/`.
+
+| Capture vs model | MAE R/G/B | within ±2 | within ±4 |
+|---|---|---|---|
+| P1 vs predict (no shift) | 0.68 / 0.76 / 0.34 | 98.2 % | 99.5 % |
+| **P2 pe 8 vs predict (+0.5)** | 0.83 / 0.86 / 0.45 | **97.1 %** | 98.3 % |
+| P2 pe 8 vs predict (no shift) | 2.91 / 2.76 / 1.79 | 59.9 % | 78.6 % |
+| P2 pe 16 vs predict (+1.0) | 1.12 / 1.19 / 0.60 | 97.1 % | 98.1 % |
+
+- **E5 (sharpness):**
+  - The PS2 blur toggle (pe 8 ↔ 0, three alternating pairs): Laplacian-variance ratio **0.626**, repeatable to 5 digits.
+  - Xbox P2/P1: 0.497 as captured. Through a simulated PS2 display resample (448 → 480 bilinear, the PCSX2 present path) it is 0.557.
+  - Absolute Laplacian variance: PS2 0.0064, P1 0.0115 (+79 %), **P2 0.0056 (−12 %)**, P2 with pe 16 0.0067.
+  - Mean colour, R/B ratio, saturation and luminance percentiles are unchanged from P1, since the blur does not shift colour.
+- **Verdict:** P2 mechanism **Confirmed** (97.1 % within ±2, and the unshifted model is clearly rejected). E5 **Confirmed [S]**: the sharpness gap to PS2 drops from +79 % to −12 %. The rest is inside the confounds (the PCSX2 present-path resample, different framing and content, and an offline sweep that is not reliable because the model also blurs the HUD). If visual sign-off wants less blur, the knob is data-only: ini pe 6 = +0.375 texel.
+- **Harness note:** the PS2 camera keeps swinging for about 20 s after a teleport even at timescale 0. Wait until frame-to-frame diffs settle (mean |d| ≈ 1) before paired toggles.
+- **Build:** `dist/default_p2p5.xbe` (P2 + P5) has sha1 ed5c41e3…. `work/xbox/gtasa_p2p5.xiso` = a stock copy with the embedded XBE replaced after checking the stock bytes, and with the embedded `stream.ini` (sector 1998977, 197 B, same size) set to pe 8 (`\t16` → `\t\t8`; a copy is at `work/xbox/stream_pe8.ini`). Boot test pending.
+- **P2 boot test (2026-09-24) [C]:** `gtasa_p2p5.xiso` boots, and slot 2 loads. Live: all P2 and P5 bytes equal the JSONs; pe offsets are 8 ×4, read from the ISO's edited `stream.ini`; blur byte 0x3CE7AD = 1, as expected (P2 NOPs the call instead). Grove St 12:00, c1 66,66,48,a254, c2 166,129,60,a254: P2 vs `predict(raw, shift=0.5)` = **99.0 % within ±2** (MAE 0.63/0.62/0.35) with the overlays and animated characters masked (help box, Stats panel, HUD, CJ, one pedestrian; 69.7 % of the frame kept). The unshifted model gets 58.1 %. The unmasked frame gives 93.2 %, and all of the excess is the translucent HUD boxes (drawn after the filter) and CJ's idle animation. The HUD renders crisp and complete. Files: `captures/grove_noon_p2boot/`.
+  - Brightness after "set 256" in the menu read **284** (`[0x6E79AC]`, ramp max +4, not the identity). The captures were linearized with the captured ramp. For exact-identity captures use `work/session_tools/xbright.py 256`.
+- **Visual sign-off (2026-09-24):** the user accepted P2 with pe 8 against the PS2. Phase 3 is closed.

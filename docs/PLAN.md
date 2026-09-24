@@ -2,7 +2,7 @@
 
 Legend: **[C]** Confirmed (read from bytes/source), **[S]** Strongly inferred, **[H]** Hypothesis requiring testing.
 
-> **Status 2026-09-24:** Phases 0–2 are done (E0, E3, E4, P1 booted). Corrections from live measurement are marked **(2026-09-24)** below; the evidence is in `docs/findings.md`.
+> **Status 2026-09-24:** Phases 0–2 are done (E0, E3, E4, P1 booted). Phase 3 is done (P2 blur, v0.2 candidate `gtasa_p2p5.xiso`). Corrections from live measurement are marked **(2026-09-24)** below; the evidence is in `docs/findings.md`.
 Xbox addresses are VAs in `default.xbe` USA Rev 1 (SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5`). File offset = VA − 0x10000 (.text), VA − 0xFB60 (.data), VA − 0x10280 (.rdata). Any .data VA ≥ 0x3D2C04 is BSS (zero at boot).
 
 Routing evidence:
@@ -75,7 +75,7 @@ The minimum viable mod is therefore **a `default.xbe` binary patch plus a 3-line
 | **Colour filter** | `fb·2c1 + fb′·2c2·(2a2/255)` | `fb + fb·c1·A1 + fb·c2·A2` [C], **then diluted by the Xbox blur pass (next row)** (2026-09-24) | `ColourFilter_PS2` | **P1 done:** rewrite of `0x24F007` (MODULATE2X) |
 | **Xbox blur pass** (2026-09-24) | absent | `0x24ECAA`, after the filter: 2× lerp of the *pre-filter* copy at α 60 → `out = 0.585·F + 0.415·raw` [C] (enable byte `0x3CE7AD`, count `0x3CE7B4`, alpha `0x3CE7B8`, UV scale `0x3CE7B0`) | — | **P1:** `0x3CE7AD` 1 → 0 |
 | **Radiosity** | on (`pe_bRadiosity 1`) | flag 0x5F4B1C = 0; function 0x24DF8E is broken [C]/[S] | PS2 / shader | **XBE rewrite** of 0x24DF8E + ini `pe_bRadiosity 1` |
-| **Filter blur** | offsets 8 → ½ px, linear | offsets unused; NEAREST [C] | `m_bBlurColourFilter` | **XBE patch** (UV offsets + LINEAR) + ini 8 |
+| **Filter blur** | offsets 8 → ½ px, linear (PS2 globals 0x668D28 [C]) | offsets unused; NEAREST [C] | `m_bBlurColourFilter` | **P2 built** (UV offsets + LINEAR) + ini 8 |
 | Dark-area boost | basemult 0.4, rate 0.0008 | 0.5 / 0.0005 (exe default 1.0) [C] | same code | **ini only** |
 | Building ambient/2× | ambient ≈×2, sums above 1 allowed | no 2× [S] | `ps2ModulateBuilding` | XBE constant/VS patch (phase 4) |
 | Foliage alpha | dual-pass-like | unknown [H] | `dualPass` | optional phase 5 |
@@ -141,7 +141,12 @@ Original design (kept for reference): in-place rewrite of `0x24F007–0x24F132` 
 
 **P5 — Neutral display gamma. BUILT (2026-09-24):** `patches/p5_display_gamma.py`. SetBrightness 0x274662 gives the default brightness 256 a brightening ramp (exp 0.85); PS2 matches the Xbox framebuffer with no ramp. P5 repoints the `addss` operand at 0x27468E from the pooled 0.2 (0x390A24, ~335 uses, must not be edited) to the read-only 0.35 at 0x390C44, so 256 becomes the identity. Fidelity: noon frame ΔE 5.7 → 1.0, night 3.8 → 2.1 (findings).
 
-**P2 — Filter blur.**
+**P2 — Filter blur. BUILT (2026-09-24):** `patches/p2_filterblur.py` → `.json`; live RAM test 97.1 % within ±2 of `predict(raw, shift=0.5)`; E5 Laplacian gap to PS2 +79 % (P1) → −12 %. As built:
+- P1 + blur is 439 B, so the body moves to the dead Xbox blur pass 0x24ECAA (504 B; only caller 0x24CC89, NOP'd), and 0x24F007 becomes `jmp 0x24ECAA`. **P2 supersedes P1**: apply P2 + P5 (the patcher refuses P1 + P2).
+- Pass 2 draws a stack copy of the quad with UVs += pe/(16·raster w|h), so the persistent quad is never touched. There is no SkyGfx W/640 or H/448 scale: pe/16 is in framebuffer pixels on both consoles.
+- Ship `pe_leftx/topy/rightx/bottomy 8` (Xbox ini 16 = a sharp 1-texel shift).
+
+Original design (kept for reference):
 - Pass 2 uses texture filter `LINEAR` (RS 9 = 2).
 - Pass 2 shifts the UVs of the Im2D verts at `0x5C7318` (stride 28, UV at +0x14/+0x18) by `off = pe_x·(W/640)/16/rasterW`, reading the now-live globals `0x3CE808/80C/810/814`.
 - The vertex ordering must be mapped to SkyGfx's (left/top on v0,v1 / v0,v3; right/bottom on v2,v3 / v1,v2). **Verified live 2026-09-24: 0x5C7318 is v0 TL, v1 BL, v2 BR, v3 TR, so the SkyGfx mapping applies as is.**
@@ -199,12 +204,9 @@ Original list:
 
 Installed: python + capstone/pefile/PIL/numpy/keystone, java 21, PCSX2 (`E:\Emuladores\PCSX2`, PINE on), xemu 0.8.136 (`E:\Emuladores\xemu`, launch `xemu-gdb.bat`), Cxbx-Reloaded (`E:\Emuladores\Cxbx-Reloaded`), Ghidra 12.1.4 (`F:\Tools\ghidra`), xdelta (`F:\Tools\xdelta`), ffmpeg, gh, git. Harness tools: `tools/xemu_gdb.py` (also `--cxbx`), `tools/pcsx2_pine.py`, `tools/ps2_cheats.pnach`.
 
-Needed:
-- **xemu** (with GDB stub `-s` for memory pokes).
-- **Ghidra** (x86 analysis of the XBE; PS2 via the ghidra-emotionengine plugin if PS2 re-verification is needed).
-- `pip install numpy keystone-engine`; optionally clang/lld for C-authored patch blobs.
+Optional: the ghidra-emotionengine plugin if PS2 code must be re-verified; clang/lld for C-authored patch blobs.
 
-Project scripts (new, under `tools/`; minimal):
+Project scripts (under `tools/`; usage in CLAUDE.md):
 - `xbe_patch.py`: applies `patches/*.json` (VA, original bytes, new bytes). It **refuses if the original bytes mismatch** and verifies the input SHA1. Emits `default.xbe` + an xdelta/BPS diff.
 - `predict_filter.py`: given a postfx-off frame + the c1/c2 read from memory, it computes the expected PS2/Xbox output (assert-based self-check with the LA 12:00 gains above).
 - `compare.py`: per-scene metrics (see §16).
@@ -282,8 +284,8 @@ SA-PS2Atmosphere/
   - Do RE target 6 (clock/weather/position on both platforms).
   - Suggest `git init` of the project (user decision).
 - **Phase 1 — Cheap proofs (E1–E3).** E3 ✅ (H1 confirmed); E2 ✅ (H2 confirmed, 2026-09-24); E1 measured in code + live (the lighting mult scales the filter colours by ≤1+basemult; ~1% at Grove St at night, so low rank confirmed; ini not changed). ini edits, the radiosity-flag test, the offline filter transplant. Gate: H1 confirmed (otherwise re-rank before patching).
-- **Phase 2 — P1 ColourFilter (E4).** ✅ E4 passed, v0.1 candidate booted (`work/xbox/gtasa_p1.xiso`); in-game interior check ✅ (2026-09-24, CJ house, 100% within ±2 outside animated pixels, HUD intact); night check ✅ (Grove St 00:00, 98.6% within ±2 on filtered pixels); P5 built and boot-tested (`gtasa_p1p5.xiso`); pause-menu check ✅ (ColourFilter not called in menus; identical to stock). **Phase 2 closed 2026-09-24.**. RE targets 1–3, then patch, then the deterministic loop. **This alone delivers the core orange atmosphere.** Ship-able milestone v0.1.
-- **Phase 3 — P2 blur (E5)** + ini offsets 8 → v0.2. **In progress:** RE target 3a done (2026-09-24); next is the live RAM test.
+- **Phase 2 — P1 ColourFilter (E4).** ✅ E4 passed, v0.1 candidate booted (`work/xbox/gtasa_p1.xiso`); in-game interior check ✅ (2026-09-24, CJ house, 100% within ±2 outside animated pixels, HUD intact); night check ✅ (Grove St 00:00, 98.6% within ±2 on filtered pixels); P5 built and boot-tested (`gtasa_p1p5.xiso`); pause-menu check ✅ (ColourFilter not called in menus; identical to stock). **Phase 2 closed 2026-09-24.** RE targets 1–3, then patch, then the deterministic loop. **This alone delivers the core orange atmosphere.** Ship-able milestone v0.1.
+- **Phase 3 — P2 blur (E5)** + ini offsets 8 → v0.2. **In progress:** RE target 3a done; P2 built, live RAM test ✅, E5 ✅ [S] (2026-09-24). Boot test ✅ (`gtasa_p2p5.xiso`, 99.0 % within ±2, HUD intact); visual sign-off ✅. **Phase 3 closed 2026-09-24.**
 - **Phase 4 — P3 radiosity (E6).** RE target 4, then Initialise raster + rewrite + ini `pe_bRadiosity 1`, then calibrate against PS2 (H4) → v0.3.
 - **Phase 5 — P4 building ambient (E7)** → v0.4, only if dark-scene metrics still diverge.
 - **Phase 6 — Optional polish.** Foliage dual pass, grass ambient, the gamma/display filter investigation (RE target 7).
@@ -291,16 +293,13 @@ SA-PS2Atmosphere/
 
 ### Current state and next session (2026-09-24)
 
-- **Builds:** `dist/default_p1p5.xbe` (P1 + P5; sha1 9c4db1ab…) → `work/xbox/gtasa_p1p5.xiso`, boot-tested. `dist/default_p1.xbe` / `gtasa_p1.xiso` are kept.
+- **Builds:** `dist/default_p1p5.xbe` (P1 + P5; sha1 9c4db1ab…) → `work/xbox/gtasa_p1p5.xiso`, boot-tested. `dist/default_p1.xbe` / `gtasa_p1.xiso` are kept. `dist/default_p2p5.xbe` (P2 + P5; sha1 ed5c41e3…) → `work/xbox/gtasa_p2p5.xiso` (embedded stream.ini pe 8), boot-tested ✅.
 - **Test saves:**
   - xemu HDD: slots 1–3. Slot 2 = EU "Ryder", converted and verified in-game. It stores brightness 384; set 256 in Options → Display, or with `work/session_tools/xbright.py 256`. Original HDD backed up as `E:\Emuladores\xemu\xbox_hdd.qcow2.bak_20260924`.
   - PCSX2 `Mcd001.ps2` slot 1: "Tagging up Turf", native v3.00 (backup `Mcd001.ps2.bak_20260924`; `mymcplus` is installed via pip).
 - **Reference scene:** Grove St (2488.2, −1665.5, 13.3), heading 1.4309, weather 0, at 12:00 and 00:00. Paired captures: `work/session_tools/scene.py`. Existing sets: `captures/grove_{noon,night}_gammafix/`.
 - **Capture rule update:** with P5 and brightness 256 the Xbox ramp is the identity, so captures need no linearization. Otherwise read the ramp first (CLAUDE.md "Gamma").
-- **Next (P2, in order):**
-  1. Live RAM test: pass 2 LINEAR, UV shift from the pe globals (poke them to 8), restore the UVs.
-  2. E5: Laplacian variance / edge sharpness vs PS2 at Grove St.
-  3. `patches/p2_filterblur.py` (cave: check other callers of 0x24ECAA first) → build P1+P2+P5 → boot ISO. Ship the ini lines `pe_leftx/topy/rightx/bottomy 8`.
+- **P2 boot-tested** (findings "P2 filter blur"). Visual sign-off ✅ with pe 8. Next: Phase 4 (P3 radiosity).
 - **Then:** P3 radiosity (Initialise raster alloc, RE target 3b/4; calibrate limit/intensity vs PS2; /255 favoured). After that, P4 ambient: the building-pipe VS constants are written **inline into the push buffer** (SetVertexShaderConstant* sees only Im2D c96), so RE target 5 must locate those writers.
 
 ## Execution context (for any executor)
@@ -310,5 +309,5 @@ SA-PS2Atmosphere/
   - `F:\Projects\GTA_SA_PS2ToXboxExperience\Microsoft - Xbox\Grand Theft Auto - San Andreas (USA) (En,Es) (Rev 1)\`
   - `…\Sony - PlayStation 2\Grand Theft Auto - San Andreas (USA) (v3.00) (Rev 1)\`
 - Deliverables: `F:\Projects\GTA_SA_PS2ToXboxExperience\{tools,patches,work,captures,docs,dist}\`.
-- Emulators: PCSX2 `E:\Emuladores\PCSX2`; xemu is to be installed.
+- Emulators: PCSX2 `E:\Emuladores\PCSX2` (PINE port 28011); xemu 0.8.136 `E:\Emuladores\xemu` (launch `xemu-gdb.bat`, GDB stub port 1234).
 - The ISOs and extracted folders must never be modified.
