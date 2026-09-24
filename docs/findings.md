@@ -510,3 +510,86 @@ Symbols come from the Cxbx-Reloaded symbol cache (`E:\Emuladores\Cxbx-Reloaded\S
   - **Conclusion:** P4 as planned (ambient ×2) must not ship alone. A faithful P4 needs ambient ×~1.75 **and** prelight ×~0.87 (day) / ×~0.75 (night), which is a 2-parameter model. Or skip P4, since the PS2/stock totals already agree at night.
   - Build for A/B only: `dist/default_p2p3p4p5.xbe` (sha1 b38df22e…). Not boot-tested; no ISO made.
 - **Decision (user, 2026-09-24): option (a), the 2-parameter P4.** Next session starts with the texture check (PS2 vs Xbox TXD for a Grove St facade texture), then the refit and the building-pipe-only implementation. The step list is in PLAN §18 "Next session plan (P4 v2)".
+
+## 2026-09-24 — P4 v2 step 1: texture check, prelight data check, PS2 display chain
+
+**Texture check (offline, `work/tex/txdmean.py`; IMG reader `work/session_tools/imgtool.py`):**
+- Hypothesis: the shared PS2 ≈ 0.87× factor is in the textures. Prediction: PS2/Xbox per-texture mean ≈ 0.87.
+- Method: every TXD whose name contains `lae` in both `gta3.img`, decoded natively. PS2: PAL4/PAL8 (CSM1 bit 3/4 swap for PAL8), alpha ×255/128. Xbox: DXT via PIL `bcn`, 8888, PAL8. Only order-free stats are used: swizzling is a texel permutation, so no unswizzle is needed. The Xbox often has 2× the resolution (same texture set, same names).
+- Result: **1483 textures, PS2/Xbox mean-luminance ratio 0.985 (IQR 0.982–0.987)**, per channel 0.981/0.987/0.981. `ganton01_lae2` (Grove facades): 0.982. **Refuted [C]:** the textures are equal; the 1.5 % is PS2 palette quantization.
+
+**Prelight data check (`work/tex/prelight.py`, `pmatch.py`):**
+- Hypothesis: the PS2 DFF vertex colours are darker than the Xbox ones.
+- Formats [C]:
+  - Xbox native geometry 0x510: the vertex buffer is the last numVerts × 28 B of the chunk: pos f32×3, night NORMPACKED3 (11:11:10 signed, /1023 /1023 /511), day D3DCOLOR (BGRA), uv f32×2.
+  - PS2 native 0x510: per mesh {size, noPointers, data}. DMA REF tags alternate with empty CNT tags. Unpacks: V4_16 signed = position (/128), V2_16 = uv (/4096, padded to an even count), **V4_16 unsigned = colour: low byte day, high byte night**. ExtraVertColour 0x253F2F9 carries the same night colours.
+- Result: vertices matched by position + uv in `compfukhouse3`, `carlshou1_lae2`, `ganghous01_lax`, `lae2_roads89` (97–99 % matched). **PS2 = Xbox within 1–3 %** for both day and night; for example `ganghous01_lax` day ratio 0.996/0.998/1.002, night 0.98. Materials: colour ffffffff and surfProps 1/0/1 on both (`compfukhouse3`). **Refuted [C]:** the vertex data are equal.
+
+**PS2 display chain [C] (HUD check + GS state; `captures/hud_check/`, `work/session_tools/ps2entry.py`, `ps2disp.py`):**
+- The Xbox HUD reads the exact CHudColours constants (money 54/104/44, clock 225, health 180/25/29), so with P5 and brightness 256 the Xbox display is the identity.
+- The PS2 HUD reads 44–48/96/36–40, 216–220 and 176/20–24: always multiples of 4, and 5-bit levels or the mean of two.
+- GS state from a PINE savestate: the render `FRAME` is **PSMCT32** (0xa0046, 640×448) with `DTHE = 0` (DIMX holds the standard matrix). The display `DISPFB2 = 0x51400` is **PSMCT16S** (FBW 10). `PMODE = 0x8067`: both circuits on, ALP 0x80, so a **50/50 merge of two circuits one line apart** (anti-flicker; circuit 1 has DH 446). The register slot mapping inside PCSX2's internal structures is inferred from the values [S].
+- Model (`ps2disp.disp`): truncate to 5 bits (`<<3`, no dither), then average rows y and y+1. It reproduces the PS2 HUD (225 → textured 223 → 216; 180 → 176; 54/104/44 → 48/96/40). Mean effect −3.5 levels, which is large in dark scenes. It also explains the earlier note "the PS2 darks are quantized in steps of 4". PCSX2 is the software renderer at 1×, and ReShade is not loaded (its log is from 2024-10). This is the game's own register setup, so it is expected on real hardware too [S].
+- Consequence: every PS2-vs-Xbox absolute comparison must apply `disp()` to the Xbox frame, or +3.5 to the PS2. Differences (on − off, ΔA sweeps) are unaffected.
+- Sweep frame means, re-read with `disp()`:
+
+| Set | raw PS2/Xbox | PS2/disp(Xbox) |
+|---|---|---|
+| night A0 (prelight only) | 0.66/0.70/0.59 | **0.75/0.79/0.76** |
+| noon A0 | 0.86/0.88/0.85 | **0.88/0.91/0.91** |
+| ambient slope (night Δ64 / noon Δ32) | 1.73 / 1.69 | unchanged |
+
+- **Verdict:** the ~0.87 day / ~0.75 night factor is neither texture nor data. About 3.5 levels of it is the PS2 16-bit display truncation. The rest (frame level: day ≈ 0.90, night ≈ 0.77, ambient ≈ 1.7×) is in the PS2 render path [S]; its exact mechanism (VU1 building microcode) is still [H]. The sky is also a little darker on the PS2 (noon ≈ 0.92–0.97 after the correction, framing-limited), so the building-only scope of the residual is [S], not [C].
+- **Decision (user, 2026-09-24): reference only.** The PS2 display chain is not emulated (the Xbox keeps 32-bit colour, no banding). `disp()` is used only to correct PS2 comparisons; P4 is fitted against the pre-display PS2 image.
+
+## 2026-09-24 — P4 v2 step 2: refit with the display model (Grove St, fresh sweeps)
+
+- Setup: `p4amb.py` on both consoles, radiosity off, weather 0, `idlecam off`. 12:00 A ∈ {0, 32, 64} → `captures/p4v2_noon/`; 00:00 A ∈ {0, 64, 128} → `captures/p4v2_night/`.
+- Analysis (`work/session_tools/p4fit.py <dir> <A> [--show] [--curve]`):
+  - The PS2 frame is registered onto the Xbox with a similarity search on gradients. Noon: scale 1.06, shift (−16, −36), corr 0.46. Night: 1.05, (−12, −28), corr 0.70.
+  - Region: the main house box (Xbox x 200–465, y 70–245), sky excluded, pixels unclamped, the 30 % worst local gradient mismatch dropped.
+  - g = mean(PS2_A0)/mean(disp(Xbox_A0)); ka = ΔPS2/ΔXbox.
+
+| Set | region | g or n (disp) | g raw | ka |
+|---|---|---|---|---|
+| noon A32 | house | 0.914/0.919/0.881 | 0.877/0.875/0.802 | 1.80/1.81/1.82 |
+| noon A64 | house | 0.891/0.899/0.857 | | 1.81/1.82/1.83 |
+| night A64 | house | 0.825/0.830/(0.54) | 0.747/0.743/0.376 | 1.82/1.83/1.79 |
+| night A128 | house | 0.777/0.792/(0.57) | | 1.75/1.72/1.71 |
+
+- By storey the corrected ratio still rises with brightness: noon upper 0.94 vs ground 0.88; night upper 0.87–0.89 vs ground 0.56–0.72. So a small extra dark-end loss remains [H] (integer floors in the PS2 colour path, or registration). Blue at night is too dark to fit.
+- **Model [S]:** PS2 building ≈ `t·(0.91·Pday·(1−b) + 0.80·Pnight·b + 1.80·A)`, then the PS2 display chain. ka/g ≈ 1.97, i.e. SkyGfx's ×2 ambient times the common ≈ 0.9 factor. Check on the natural night frame (p4fid table): 0.80·25.5 + 1.80·10.8 − 3.5 = 36.3 vs PS2 37 ✓.
+- Scalar (channel-uniform) parameters for P4 v2: **g 0.91, n 0.80, ka 1.80**.
+
+## 2026-09-24 — P4 v2 step 3–4: built, live RAM test, natural-scene fidelity
+
+**Constant readers [C] (`work/session_tools/vsc.py`, xemu vsh.c fields: FLD_CONST dword1 bit 13, −96; A/B/C MUX = 3):**
+- c23 is read **only by the 4 DN building blobs** 0x3C9B18/0x3C9C00/0x3C9DA8/0x3C9E90.
+- The other 4 building blobs (0x3C9FB8/0x3CA060/0x3CA1C8/0x3CA270) light as `prelight·c20 + c15·c21`, without c23. The earlier "all 8 share the DN core" note is corrected here.
+- No vehicle or ped blob reads c23. c15 is read by all 15 lit blobs.
+
+**c23 sites [C]:** 0x166E4C (b = `[0x3C9B10]`) and 0x1677BB (b = `[0x3C9DA4]`), 41 B each: `movss b; movaps xmm1, xmm4(=1,0,0,0); subss; stores b, 1−b, xmm7(=0, xorps), xmm7`, then `call 0x35D0A0` with ecx 0x77 (c23). The shared setup 0x16A1E5 does not upload c23.
+
+**P4 v2 (`patches/p4_building_ambient.py` → `.json`, 5 blocks):**
+- c15 blocks: `min(pAmbient, 1) · (KA, KA, KA, 1)`; the shared block keeps the building-VS gate.
+- c23 sites: `(b, 1−b, 0, 0) · (N, G, 0, 0)` via `unpcklps` + `mulps`.
+- The constants (N, G, 0, 0) and (KA, KA, KA, 1) sit in the tail of block 0x166D91 (0x166DC7), after its `jmp`.
+- G 0.91, N 0.80, KA 1.80. The selftest checks the stock patterns, full disassembly, the preserved registers (eax, xmm4, xmm7), the constant bytes and a scalar `model()`.
+- A/B build: `dist/default_p2p3p4p5.xbe` (sha1 2d98911b…), not boot-tested.
+
+**Live (RAM, `p4live.py on`, 00:00) [C]:** c23 = (0.800, 0, 0, 0) = N·b with b = 1; c15 = 0.1553 = 22/255 × 1.8 on the DN setup and the shared setup (building VS).
+- `vslog.py` now steps off each breakpoint (the tracer bug in "Harness"); before this it logged the same Im2D hit 400 times.
+
+**Natural-scene fidelity (`p4fid.py`, radiosity as shipped; `captures/p4v2_fid_{night,noon}/`), PS2 / disp(Xbox), 1.0 = match:**
+
+| Region | 00:00 stock | 00:00 P4 v2 | 12:00 stock | 12:00 P4 v2 |
+|---|---|---|---|---|
+| house facade (registered) | 1.14/1.24/1.49 | **1.04/1.02/0.97** | 1.03/0.95/0.93 | **1.02/1.03/1.00** |
+| ground y ≥ 255 | 1.07/1.18/1.32 | 0.90/0.88/0.81 | 0.90/0.86/0.84 | **0.93/0.96/0.93** |
+| frame median lum (PS2 39.8 / 99.7) | 34.9 | 44.4 | 112.9 | 104.9 |
+
+- **Verdict:** the facade is matched at both hours and the noon ground improves. At night the ground overshoots about 10–20 % (the Xbox is now too bright). Candidates [H]:
+  - (1) the ground models are non-DN or use a different pipe (prelight ×1, ambient ×1.8);
+  - (2) the street lamps' light pools at 00:00 differ between the consoles;
+  - (3) weak registration on the near ground (parallax).
+- **Decision (user, 2026-09-24):** no parameter compromise. The next session investigates the ground first (pipe/VS, alpha decals, lamp pools). The step list is in PLAN §18 "Next session plan (ground)". P4 v2 stays off in RAM, and the committed JSON holds the facade values.

@@ -1,26 +1,40 @@
 {
-  "name": "P4 PS2 building ambient (c15 x2 in the building pipe setups)",
+  "name": "P4 v2 PS2 building lighting (c23 x (N 0.8, G 0.91), c15 x KA 1.8)",
   "patches": [
     {
       "va": "0x166d91",
       "orig_sha1": "68e4bb9eeb17a431c3f648042ec97f128f7b2db4",
       "len": 86,
-      "new": "8b0dfc4b5f000f1041180f28d40fc6d2000f5dc20f1145540f58c00f1345540f15c0f30f11455ceb2dcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "note": "c15 = min(pAmbient,1), xyz x2"
+      "new": "8b0dfc4b5f000f1041180f28d40fc6d2000f5dc20f1145540f1015d76d16000f59c20f114554eb2ecccccccccccccccccccccccccccccdcc4c3fc3f5683f00000000000000006666e63f6666e63f6666e63f0000803f",
+      "note": "c15 = min(pAmbient,1)*(1.8,1.8,1.8,1); constants (N,G,0,0),(KA,KA,KA,1) at 0x166dc7"
     },
     {
       "va": "0x167700",
       "orig_sha1": "68e4bb9eeb17a431c3f648042ec97f128f7b2db4",
       "len": 86,
-      "new": "8b0dfc4b5f000f1041180f28d40fc6d2000f5dc20f1145540f58c00f1345540f15c0f30f11455ceb2dcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "note": "c15 = min(pAmbient,1), xyz x2"
+      "new": "8b0dfc4b5f000f1041180f28d40fc6d2000f5dc20f1145540f1015d76d16000f59c20f114554eb2ecccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "note": "c15 = min(pAmbient,1)*(1.8,1.8,1.8,1)"
     },
     {
       "va": "0x16a30a",
       "orig_sha1": "8a8392f2279c9bce3888592a86a403b29f7a97c6",
       "len": 86,
-      "new": "8b0dfc4b5f000f1041180f28d40fc6d2000f5dc20f1145e08b1550473d003b1534295f00740a3b1540295f007402eb0f0f58c00f1345e00f15c0f30f1145e8eb15cccccccccccccccccccccccccccccccccccccccccc",
-      "note": "c15 = min(pAmbient,1), xyz x2 if RW VS is a building one"
+      "new": "8b0dfc4b5f000f1041180f28d40fc6d2000f5dc20f1145e08b1550473d003b1534295f00740a3b1540295f007402eb0e0f1015d76d16000f59c20f1145e0eb16cccccccccccccccccccccccccccccccccccccccccccc",
+      "note": "c15 = min(pAmbient,1)*(1.8,1.8,1.8,1) if RW VS is a building one"
+    },
+    {
+      "va": "0x166e4c",
+      "orig_sha1": "b976b8666bf5b162ab799d44d923bf22a31f99eb",
+      "len": 41,
+      "new": "f30f1005109b3c000f28ccf30f5cc80f14c10f100dc76d16000f59c10f1145286a77598d5528909090",
+      "note": "c23 = (b,1-b,0,0)*(0.8,0.91,0,0)"
+    },
+    {
+      "va": "0x1677bb",
+      "orig_sha1": "10c963f55abd27382bcac7c5ded898eb035a2cf9",
+      "len": 41,
+      "new": "f30f1005a49d3c000f28ccf30f5cc80f14c10f100dc76d16000f59c10f1145286a77598d5528909090",
+      "note": "c23 = (b,1-b,0,0)*(0.8,0.91,0,0)"
     }
   ]
 }
