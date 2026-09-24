@@ -1,0 +1,9 @@
+# Original game dumps (copyrighted, huge) - never commit
+/Microsoft - Xbox/
+/Sony - PlayStation 2/
+*.iso
+# Working copies of game binaries and captures
+/work/
+/captures/
+/dist/*.xbe
+__pycache__/

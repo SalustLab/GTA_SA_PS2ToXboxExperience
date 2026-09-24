@@ -1,0 +1,46 @@
+gametitle=Grand Theft Auto - San Andreas (SLUS-20946) v3.00 - capture harness (PLAN E0)
+// Install: copy to E:\Emuladores\PCSX2\cheats\SLUS-20946_2C6BE434.pnach (CRC = XOR of all ELF words;
+// method validated against PCSX2's logged CRC for another game).
+// Enable exactly one Clock group and one Weather group. Writes are continuous (place 1), which also
+// freezes the clock. Addresses: docs/findings.md "RE target 6" ($gp = 0x66B870).
+// Weather ids follow gta-reversed eWeatherType [S].
+
+[Clock 12:00]
+patch=1,EE,0066BF2C,byte,0000000C
+patch=1,EE,0066BF30,byte,00000000
+patch=1,EE,0066BF34,short,00000000
+
+[Clock 19:30]
+patch=1,EE,0066BF2C,byte,00000013
+patch=1,EE,0066BF30,byte,0000001E
+patch=1,EE,0066BF34,short,00000000
+
+[Clock 00:00]
+patch=1,EE,0066BF2C,byte,00000000
+patch=1,EE,0066BF30,byte,00000000
+patch=1,EE,0066BF34,short,00000000
+
+[Weather 1 SUNNY_LA]
+patch=1,EE,0066C4A4,short,00000001
+patch=1,EE,0066C4A8,short,00000001
+patch=1,EE,0066C4AC,short,00000001
+
+[Weather 8 RAINY_SF]
+patch=1,EE,0066C4A4,short,00000008
+patch=1,EE,0066C4A8,short,00000008
+patch=1,EE,0066C4AC,short,00000008
+
+[Weather 9 FOGGY_SF]
+patch=1,EE,0066C4A4,short,00000009
+patch=1,EE,0066C4A8,short,00000009
+patch=1,EE,0066C4AC,short,00000009
+
+[Weather 14 SUNNY_COUNTRYSIDE]
+patch=1,EE,0066C4A4,short,0000000E
+patch=1,EE,0066C4A8,short,0000000E
+patch=1,EE,0066C4AC,short,0000000E
+
+[Weather 17 EXTRASUNNY_DESERT]
+patch=1,EE,0066C4A4,short,00000011
+patch=1,EE,0066C4A8,short,00000011
+patch=1,EE,0066C4AC,short,00000011
