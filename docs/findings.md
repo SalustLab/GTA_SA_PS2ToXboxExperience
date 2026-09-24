@@ -187,3 +187,184 @@ Symbols come from the Cxbx-Reloaded symbol cache (`E:\Emuladores\Cxbx-Reloaded\S
 
 - **Verdict:** P1 closes most of the colour gap (Phase 2 goal). Remaining gap (saturation, deep shadows, glow) is expected from P2 blur / P3 radiosity / P4 building ambient, which are not applied yet.
 - Note: `display.ui.show_menubar = false` in xemu.toml did not hide the menubar (it still appears in the top ~12 rows of captures); the analysis masks rows < 14.
+
+## 2026-09-24 — Test saves past the first missions (interiors)
+
+- The xemu HDD had no GTA SA save, only `UDATA/545400a3/{TitleMeta,TitleImage,SaveImage}.xbx`. Title ID `545400A3` = Second Edition (v2). First-edition saves use `54540082` (NTSC) and `54540086` (PAL).
+- Xbox save format [C]: `GTA_SA.xsv` = a 20-byte signature + the standard 0x31800-byte SA save (checksum = byte sum, as on PC). Signature = HMAC-SHA1(key, data[20:]), key = HMAC-SHA1(XboxCERTKey `5C0733AE…1FE0`, XBE cert SignatureKey at cert+0xC0)[:16] = `2914C3D3C61115BF5CD42C09655FED02`. The computed signature matches a genuine v2 save (roamable, not tied to the console).
+- v1 → v2 conversion [C]:
+  - Version ID: v1 = `4CDC1D64`, v2 = `F68D14FD` (block 0 +0).
+  - MAIN is 196293 B in v1 and 196272 B in v2, and the 21-byte edit comes before every saved IP. Every relative thread IP and return-stack slot is shifted −21. All 28 threads then land after a `wait`, and the return slot lands after a `gosub`. A genuine v2 save has main at `0xEB36` = v1's `0xEB4B` − 21.
+  - The scm-size field is set to 196272, then the checksum is recomputed and the save re-signed. Block sizes match v1/v2 exactly.
+- Installed in `E:\Emuladores\xemu\xbox_hdd.qcow2` (original backed up as `xbox_hdd.qcow2.bak_20260924`):
+  - slot 1 "Big Smoke": a genuine v2 save, unmodified (GameFAQs 9370), $999,999,999;
+  - slot 2 "Ryder": EU v1, converted, clean (GameFAQs 12695);
+  - slot 3 "Ryder": NA v1, converted, $999M, has-cheated flag set (GameFAQs 8099).
+- Tools (read-only qcow2+FATX reader, installer that rewrites a fresh qcow2 and verifies every cluster, converter) and the downloads are in `work/saves/` (gitignored).
+- Status: slot 1 is the zero-risk save. Slots 2–3 depend on the conversion **[S]**; untested in-game.
+
+## 2026-09-24 — P1 in-game interior check (CJ's house)
+
+- Setup: `gtasa_p1.xiso` with save slot 2 (the converted Ryder save, which loads fine → the v1→v2 conversion is **[C]**). CJ is inside interior 3 at (2495.6, −1700.9, 1014.7), clock about 06:30, `timescale 0`.
+- Live checks [C]: RAM at 0x24F007 = P1 code, and `0x3CE7AD` = 0.
+- Gamma ramp idx 0 is **not** the identity (`[0,32,64,128,192,255] → [6,63,101,160,210,255]`). Saved as `captures/cj_house_int/_gamma_ramp.bin`; captures are linearized through its inverse.
+- ColourFilter args (`filterargs`) [C]: c1 = (64,64,64, a128), c2 = (64,64,64, a254). This is a neutral interior filter.
+  - PS2 formula: gain ≈ 1.00.
+  - Stock Xbox formula: 1.376 (before the blur mix).
+- Hypothesis: P1 in an interior matches `predict_filter` (PS2) within ±2 and leaves the HUD untouched. Prediction: ≥ 90% of pixels within ±2, and HUD P1 == raw (raw = ColourFilter call NOP at 0x24CAF5).
+- Result:
+  - Whole frame (rows < 14 masked): 95.6% within ±2. The misses all fall in one box (x 268–396, y 173–428) where CJ's idle animation and the bobbing entry marker keep moving at `timescale 0`; two P1 captures differ from each other in the same box.
+  - Outside that box: **100% within ±2**, MAE 0.51 / 0.51 / 0.48.
+  - HUD (clock, money, health, weapon, radar): P1 vs raw max 2, MAE 0.30, so the MODULATE restore holds in interiors.
+- **Verdict: Confirmed.** Caveat: the interior filter is close to the identity under the PS2 formula, so this scene tests state safety (HUD, restore, no artefacts) more than the colour transform. The night check is the stronger remaining test.
+
+## 2026-09-24 — P1 in-game night check (Grove St, 00:00, SUNNY_LA)
+
+- Setup: slot 2 save on `gtasa_p1.xiso`, player at (2488.2, −1665.5, 13.3). Clock frozen at 00:00, weather 0, then `timescale 0`. Gamma ramp idx 0 is the same non-identity ramp as in the interior check; captures are linearized.
+- ColourFilter args [C]: c1 = (93,93,93, a254), c2 = (64,129,130, a254).
+  - PS2 gain ≈ 1.23 / 1.74 / 1.75.
+  - Stock Xbox gain ≈ 1.61 / 1.87 / 1.87 (formula only).
+- Hypothesis: P1 at night matches the PS2 formula within ±2 on filtered pixels. Prediction: ≥ 95% within ±2 and near-zero bias; P1 vs the Xbox formula far off.
+- Result (rows < 14 masked; pixels that move between two P1 captures masked, 6.1%):
+  - All static pixels: 94.8% within ±2. Every outlier is a pixel where P1 == raw: the HUD, radar, help text and streetlight coronas. These are drawn after PostFX, so the prediction wrongly filters them.
+  - Excluding pixels drawn after the filter (P1 == raw within ±2): **98.6% within ±2, 99.5% within ±4**, MAE 0.47 / 0.68 / 0.80, bias +0.2 / −0.0 / +0.1.
+  - P1 vs the stock-Xbox formula: 5.3% within ±2 (bias −11.5 / −5.8 / −4.5).
+  - HUD and coronas are unfiltered and intact (`_raw_vs_p1_bad.png`).
+- **Verdict: Confirmed.** P1 applies the PS2 colour-filter formula at night, and the stage-state restore holds. PS2 fidelity at this spot/time (a PCSX2 reference) is not measured yet.
+
+## 2026-09-24 — PS2 test save (PCSX2 memory card)
+
+- Our PS2 disc is v3.00 (Greatest Hits): MAIN is 196586 B, globals 43792 [C], and the save version ID is `F68D14FD` (the same as Xbox v2). v3.00 MAIN differs from Xbox v2 MAIN (+314 B), so an Xbox→PS2 conversion would need an IP remap. Most PS2 saves online are v1 (`4CDC1D64`, globals 43768), which is incompatible.
+- Used a native v2 save instead: GTASnP `Kn1lF4` "Tagging up Turf" (the mission after Ryder), downloaded with all site edits off. It has no cheats, $50,723, and was saved in CJ's house.
+  - Checks [C]: ID `F68D14FD`, globals 43792, scm size 196586 = our MAIN, checksum OK, and all 28 thread IPs land after a `wait` in our v3.00 `MAIN.SCM`.
+- Folder `BASLUS-20946GTA50000` (one folder holds every slot's `N  Mission.b`):
+  - `icon.sys` and icons come from a PCSX2 `.psu` (GameFAQs 34735). Its `icon.sys` is identical to that of a v3.00 save.
+  - The 1 KB `BASLUS-20946GTA50000` header comes from a genuine v3.00 save (GameFAQs 25084).
+- Imported into `E:\Emuladores\PCSX2\memcards\Mcd001.ps2` with `mymcplus` (pip). Original backed up as `Mcd001.ps2.bak_20260924`. `mymcplus check`: no errors; the save read back from the card is byte-identical. Card free space is now 108 KB, so extra in-game save slots will not fit on this card. Untested in-game.
+
+## 2026-09-24 — Interior fidelity vs PS2 (CJ's house)
+
+- PS2 reference: `Tagging up Turf` save (it loads in PCSX2 → PS2 save **[C]**), software renderer 1×, clock 06:30, weather 0. CJ teleported to the Xbox capture spot (2495.6, −1700.9, 1014.7), then `timescale 0`.
+  - Framing differs: the PS2 camera is lower and closer, so only global stats and hand-matched patches are used.
+  - Variants are in `captures/cj_house_int/vs_ps2/`, rows < 14 cropped. The Xbox frames are linearized (= default brightness), because this Xbox save has a raised brightness ramp.
+  - "Stock" is an **estimate**: raw × (1 + 0.585·(c1·a1 + c2·a2)) = 1.22×. It is not a capture.
+- Global metrics (linear): see the table.
+
+| Metric | PS2 | Xbox stock (est.) | Xbox + P1 |
+|---|---|---|---|
+| luminance mean | 0.140 | 0.199 | **0.165** |
+| luminance p5 | 0.003 | 0.046 | 0.036 |
+| HSV saturation mean | 0.472 | 0.322 | 0.329 |
+| R/B | 1.342 | 1.275 | 1.280 |
+
+- Patches (ΔE76 vs PS2, stock → P1): blue wall 20.7 → 13.4; wooden floor 7.5 → 4.6; door 17.3 → 8.9; ceiling 1.3 → 4.2.
+- As displayed with this save's brightness ramp, Xbox luminance is 0.28 vs PS2 0.14, so the brightness option alone dominates. Fidelity captures need the Xbox brightness at its default (identity ramp).
+- **Reading:**
+  - The interior filter is neutral, so P1 only removes Xbox's 1.22× brightening. That closes about 57% of the luminance-mean gap and most of the wall/door ΔE.
+  - What remains is **not** ColourFilter: the PS2 has much deeper shadows (p5 0.003 vs 0.036) and far more saturation (0.47 vs 0.33), for example the PS2 floor at 26/12/2. These are candidates for lighting/ambient (H5/P4), radiosity (P3) or the PS2 brightness setting (unknown for this save) [H].
+
+## 2026-09-24 — Xbox brightness default + night fidelity vs PS2 (Grove St, 00:00, SUNNY_LA)
+
+**Xbox brightness [C]:**
+- `SetBrightness(float b)` is at 0x274662. `b` = menu int `[0x6E79AC]` (FrontEndMenuManager+0x3C) × 1/512.
+- Exponent = 1 − 0.7·b + 0.2 (constants 0x390AAC / 0x39087C / 0x390A24). The ramp is `pow(i/256, exp)·255` → `SetGammaRamp(1, 0x5F20F0)`.
+- Callers: menu slider 0x11C9E9, "restore defaults" 0x11DDCB (writes 256 and calls with 0.5), and settings load 0x11BFC7/0x11C11B/0x163FCE.
+- **The default 256 is not the identity**: exponent 0.85 (`128→141`), which brightens. The identity seen in the first session was an untouched buffer. The Ryder save had 384 (exponent 0.675).
+- Set live to 256 by injecting `SetBrightness(0.5)` through GDB (hijacked at the PostFX Render entry 0x24C537, registers restored). Resulting ramp idx 1 = `[2,44,79,142,200,255]`, the known 0.843 ramp.
+
+**Night captures:**
+- Both consoles were at (2488.2, −1665.5, 13.3), heading 1.43, 00:00, weather 0, `timescale 0`. Xbox stock was captured live by restoring the original 0x24F007 bytes + blur byte 1, then P1 was put back and verified.
+- The PS2 frame has no HUD/CJ and a slightly different camera, so the stats are regional with CJ/HUD/menubar masked. Files: `captures/grove_night/{ps2,xbox_stock_display,xbox_p1_display}.png`, `_ps2_stock_p1.png`.
+
+| Region | Metric | PS2 | Xbox stock | Xbox P1 |
+|---|---|---|---|---|
+| frame | R/B | 0.73 | 1.07 | **0.95** |
+| road | R/B | 1.19 | 1.92 | **1.56** |
+| road | saturation | 0.306 | 0.476 | **0.366** |
+| frame | lum (displayed, ramp 256) | 0.133 | 0.175 | 0.192 |
+| frame | lum (ramp removed) | 0.133 | 0.130 | 0.144 |
+
+**Reading:**
+- P1 moves the night hue toward PS2 (teal instead of brown).
+- The displayed image is brighter than PS2 because of the **Xbox display gamma at default brightness (exp 0.85)**. With the ramp removed, luminance matches PS2 within ~0.01. So PS2 ≈ Xbox framebuffer without a display ramp **[S]** (the PS2 save's own brightness setting was not read).
+- Candidate data patch [H]: `0x390A24` 0.2 → 0.35 makes brightness 256 give exponent 1.0 (identity), leaving the slider working. Test it against the PS2 in another scene before adopting it.
+
+## 2026-09-24 — Gamma fix test: `0x390A24` 0.2 → 0.35 (brightness 256 = identity ramp)
+
+- Hypothesis: the remaining displayed-brightness gap to PS2 is the Xbox default display gamma (exp 0.85). Prediction: with brightness 256 mapped to the identity ramp, P1's luminance and mean-colour ΔE vs PS2 drop in both a day and a night scene.
+- Method:
+  - Live RAM poke `0x390A24` = 0.35, then `SetBrightness(0.5)` injected. The ramp becomes **exactly the identity** on all 768 entries [C].
+  - Grove St (2488.2, −1665.5, 13.3), heading 1.43, weather 0, at 12:00 and 00:00. Both consoles frozen. Captures:
+    - PS2;
+    - Xbox P1 and stock (live), both captured with the fix;
+    - "default gamma" variants: the default ramp applied to those same frames, exact because the fixed display = framebuffer.
+  - Masks: HUD, radar, CJ, menubar. Files: `captures/grove_{noon,night}_gammafix/`, `_grid.png`.
+- Result (PS2 vs Xbox; ΔE76 of the region's mean colour; dlum = Xbox − PS2):
+
+| Scene / region | stock, default gamma | P1, default gamma | **P1 + fix** |
+|---|---|---|---|
+| noon frame | ΔE 21.6, dlum +0.034 | ΔE 5.7, dlum +0.055 | **ΔE 1.0, dlum +0.002** |
+| noon sky | 35.4 | 7.6 | 7.5 |
+| noon road | 25.2 | 11.3 | **6.9** |
+| night frame | ΔE 3.8, dlum +0.017 | ΔE 3.8, dlum +0.031 | **ΔE 2.1, dlum −0.015** |
+| night sky | 6.8 | 9.3 | **3.2** |
+| night road | 7.9 | 3.5 | 4.9 |
+
+- **Verdict: Confirmed.** The fix improves whole-frame fidelity in both scenes. With it, PS2 ≈ the Xbox framebuffer with no display ramp [S→C for these two scenes].
+  - Side effect: the brightness slider still works (exp = 1.35 − 0.7·b, so it brightens only above 256).
+  - Remaining gaps: noon saturation (−0.10), noon sky (PS2 more teal), night road slightly darker (−0.03). These are candidates for P2/P3.
+- Live state left in the xemu session: `0x390A24` = 0.35, brightness 256.
+
+## 2026-09-24 — Diagnosis of the two residuals after P1 + gamma fix (noon sky, night asphalt)
+
+- **Region boxes were framing-confounded.** The PS2 camera sits lower and closer and is pitched differently, so the same box samples a different height of the sky gradient. Re-measured by content (sky/asphalt pixel classes) at matched luminance. **Both residuals are real:**
+  - Noon sky at equal luminance: PS2 81/187/178 vs P1+fix 104/178/173 (PS2 less red); the PS2 sky reaches higher luminance.
+  - Night asphalt at equal luminance: PS2 40/47/31 vs 42/44/27 (PS2 greener/bluer); median lum 42 vs 36.
+- **E2 (live `0x5F4B1C` = 1, noon) → H2 Confirmed.** The Xbox radiosity is called after ColourFilter at 0x24CD7D with args limit `[0x6C88DC]` (int; 180 at noon, 90 at midnight), filterPasses 2, renderPasses 1, intensity 35 (`0x3CE7C4..D0`). With it on, only edges change (a slight shift/blur) and bright pixels get marginally darker (−0.3). There is **no bloom**.
+- **Offline PS2-radiosity model** (PLAN §9 P3: downsample ×4, `2D − limit`, add ×intensity/k):
+  - Noon: the sky gets closer (ΔE 6.3 → **3.3** with /255; /128 overshoots, 10.2, so H4 favours **/255**), but the whole frame gets worse (ΔE 1.1 → 3.3) because the ground passes the limit too.
+  - The PS2 sky's lower R cannot come from an additive bloom, so part of the sky gap is already in the pre-filter sky [H].
+  - Night: the model does not touch asphalt (below limit 90) and the frame ΔE goes 2.2 → 2.0.
+- **E1 (lighting mult) ruled out here [C].** 0x24C6B6–0x24C75F: `L` (smoothed light level at the player, `[0x75865C]`, rate `pe_lightchangerate`, cap `pe_lightingbasecap`) gives `mult = 1 + (1 − L/cap)·pe_lightingbasemult`, which scales the ColourFilter colour bytes. Live at Grove St, midnight: L = 0.30 of cap 0.35 → mult 1.071 (Xbox 0.5) vs 1.057 (PS2 0.4). That is about 1%, negligible.
+- **Night asphalt → H5 (building ambient) is the remaining candidate [S].** The PS2 − P1 difference at matched luminance is ≈ +2/+8/+7, i.e. a teal additive term that looks like extra night ambient. Not gamma, not E1, not radiosity.
+  - For P4: the building-pipe constant-upload functions around 0x166E26 (c6D–c70, c77, c80/81, c74–76) do not fire in this scene.
+  - A 400-hit log of `SetVertexShaderConstant*` saw only RW Im2D's c96 (0x2AB925). So the 3D pipes write their constants **inline into the push buffer**; RE target 5 has to find those writers.
+
+## 2026-09-24 — P5 built: neutral display gamma (operand repoint, not a constant edit)
+
+- **Correction to "Gamma fix test".** `0x390A24` is the compiler's pooled float 0.2, with ~335 references game-wide (raw operand search). Editing it changes unrelated systems, and the live test did that while its captures were taken. Reverted in RAM.
+  - The ramp and fidelity results stand: those frames were frozen, and the ramp depends only on SetBrightness.
+  - "Candidate data patch `0x390A24` 0.2 → 0.35" is **withdrawn**.
+- **P5 as built [C]:**
+  - `addss xmm0, [0x390A24]` at 0x27468E (`F3 0F 58 05` imm32) now reads `[0x390C44]`, an existing float 0.35 in the same constant pool.
+  - `.rdata` flags 0x6: not writable.
+  - Only the 4-byte operand at 0x274692 changes (`240A3900` → `440C3900`, 2 bytes differ).
+  - Live: operand poked, pooled 0.2 untouched, `SetBrightness(0.5)` → exact identity ramp on all channels.
+- `patches/p5_display_gamma.py`: guards the instruction bytes and the 0.35 value. Its `--selftest` models the game's ramp loop and reproduces all three live ramps: stock 256, Ryder-save 384, and fixed = identity.
+- `dist/default_p1p5.xbe` sha1 9c4db1ab…; `work/xbox/gtasa_p1p5.xiso` (embedded XBE replaced at sector 348678 after verifying the stock bytes). Boot test pending.
+- **P5 boot test (2026-09-24) [C]:** `gtasa_p1p5.xiso` boots and slot 2 loads. Live: P1 code, blur byte 0, P5 operand `440C3900`, pooled 0.2 intact. The save restores its own brightness (384 → exp 0.825 under P5, ramp `128→144`; stock at 384 gives `128→160`), so brightness is per-save state. Setting 256 (slider or "restore defaults") gives the exact identity ramp.
+
+## 2026-09-24 — P1 pause-menu check (Phase 2 closed)
+
+- `gtasa_p1p5.xiso`, pause menu (Map tab). A breakpoint at 0x24F007 never hits within 3 s → **ColourFilter is not called while the menu is up [C]**.
+- Capture with P1+P5 vs live stock ColourFilter + blur on: **0 pixels differ** (max diff 0). Repeat P1 capture also identical. The menu renders normally, with no leaked stage state (`captures/pause_menu/_p1p5_vs_stock.png`).
+- **Verdict: Confirmed.** Phase 2 in-game checks (interior, night, menu) are all passed.
+
+## 2026-09-24 — Phase 3 prep: RE target 3a (ColourFilter quad) + P2 design notes
+
+- **ColourFilter quad at 0x5C7318 (live) [C]:**
+  - Vertices (stride 28):
+    - v0 = (0, 0) top-left, UV (0.00049, 0.00098);
+    - v1 = (0, 512) bottom-left;
+    - v2 = (1024, 512) bottom-right;
+    - v3 = (1024, 0) top-right.
+  - Index buffer 0x3CE82C = (0,1,2, 0,2,3). This **matches SkyGfx's corner mapping** directly: left → v0,v1; top → v0,v3; right → v2,v3; bottom → v1,v2.
+  - UV at +0x14/+0x18; the half-texel bias is already present.
+- **Blur offsets `0x3CE808/80C/810/814` (left/top/right/bottom) read 16/16/16/16 live**: Xbox `stream.ini` value; the PS2 ships 8.
+  - SkyGfx: off_u = pe·(W/640)/16/rasW, off_v = pe·(H/448)/16/rasH, with the copy raster 1024×512.
+  - pe 8 → +0.5 texel (u and v), which with LINEAR gives the PS2's soft 2×2 blur of the pass-2 term. pe 16 → a full-texel shift, with no blur.
+  - [S] The PS2 value 8 is needed; for the RAM test poke the four globals. The shipped mod gives the ini lines (PLAN §15).
+- **Code cave candidate:** the Xbox blur pass 0x24ECAA–0x24EEA1 (0x1F8 B; dead since P1 sets 0x3CE7AD = 0).
+  - It starts `push ebp; mov ebp,esp; sub esp,0x28; cmp byte [0x3CE7AD],0; …; je 0x24EE9F`, and its only known call is at 0x24CC89. Not checked yet: whether other callers exist.
+  - Alternative: 34 free bytes left in P1's 300-byte ColourFilter slot. That is too small for UV shift + restore.
+- **P2 requirements:** pass 2 only, texture filter LINEAR (RwRenderStateSet 9 = 2), then back to NEAREST. The UVs must be restored after the draw (0x5C7318 persists across frames, so shifts would accumulate).
