@@ -77,7 +77,7 @@ The minimum viable mod is therefore **a `default.xbe` binary patch plus a 3-line
 | **Radiosity** | on (`pe_bRadiosity 1`; flag 0x66CEC8 [C]) | flag 0x5F4B1C = 0; function 0x24DF8E is broken [C] (E2) | PS2 (fixed-function path) | **P3 built** (rewrite of 0x24DF8E) + ini `pe_bRadiosity 1` |
 | **Filter blur** | offsets 8 → ½ px, linear (PS2 globals 0x668D28 [C]) | offsets unused; NEAREST [C] | `m_bBlurColourFilter` | **P2 built** (UV offsets + LINEAR) + ini 8 |
 | Dark-area boost | basemult 0.4, rate 0.0008 | 0.5 / 0.0005 (exe default 1.0) [C] | same code | **ini only** |
-| Building ambient/2× | ambient ≈×2 relative to prelight [C, sweep]; prelight ~0.87× day / ~0.75× night vs Xbox [S] | `(prelight·surfDiff + ambient·surfAmb)·matCol` [C, VS decoded] | `ps2ModulateBuilding` | **P4**: c15 ×2 built; 2-parameter version next |
+| Building ambient/2× | ambient ≈×2 relative to prelight [C, sweep]; prelight ~0.87× day / ~0.75× night vs Xbox [S] | `(prelight·surfDiff + ambient·surfAmb)·matCol` [C, VS decoded] | `ps2ModulateBuilding` | **P4 v2 done** (G 0.91 / N 0.80 / KA 1.80, building pipes only) |
 | Foliage alpha | dual-pass-like | unknown [H] | `dualPass` | optional phase 5 |
 | Fog / sky | timecyc | same code path [S] | engine default | none |
 | Vehicles | PS2 env/spec | Xbox spec pipe | selectable | **keep Xbox** |
@@ -165,7 +165,9 @@ Original design (kept for reference): replace the body of `0x24DF8E` (≈2.4 KB 
 - Raster creation: patch `CPostEffects::Initialise` (locate it via writers of `0x5F4B28`) to allocate one ½-res raster.
 - Enable via the ini `pe_bRadiosity 1` (flag 0x5F4B1C, reader 0x24CD43).
 
-**P4 — Building ambient. BUILT, not shippable as is (2026-09-24):** `patches/p4_building_ambient.py`. Three 86-byte c15 clamp blocks are rewritten in place (0x166D91 and 0x167700 always; 0x16A30A only for the building VS `[0x5F2934]`/`[0x5F2940]`, because that setup is shared with the vehicle/unlit pipes): c15 = 2·min(pAmbient, 1), w kept. E7 live: ambient response exactly 2.00×, vehicles untouched. A VS-operand edit is impossible because the ILU pairing uses operand C. Natural scenes get *worse*: the PS2 prelight is ~0.87× (day) / ~0.75× (night) of the Xbox's [S], and the common ~0.87 could be textures [H]. Options: (a) 2-parameter P4 (ambient ×~1.75, prelight ×~0.87, night set ×~0.86 via c20/c23 on building pipes only), after a texture check; (b) drop P4. **Chosen: (a)** (user, 2026-09-24). Details: findings "Phase 5". Original text follows.
+**P4 v2 — Building lighting. DONE (2026-09-25):** G 0.91 / N 0.80 / KA 1.80 on the building pipes only (c23 + c15), boot-tested in `gtasa_p2p3p4p5.xiso` and signed off; see §18 and findings "P4 v2 step 3–4", "Ground investigation". History follows.
+
+**P4 v1 — Building ambient. BUILT, not shippable as is (2026-09-24):** `patches/p4_building_ambient.py`. Three 86-byte c15 clamp blocks are rewritten in place (0x166D91 and 0x167700 always; 0x16A30A only for the building VS `[0x5F2934]`/`[0x5F2940]`, because that setup is shared with the vehicle/unlit pipes): c15 = 2·min(pAmbient, 1), w kept. E7 live: ambient response exactly 2.00×, vehicles untouched. A VS-operand edit is impossible because the ILU pairing uses operand C. Natural scenes get *worse*: the PS2 prelight is ~0.87× (day) / ~0.75× (night) of the Xbox's [S], and the common ~0.87 could be textures [H]. Options: (a) 2-parameter P4 (ambient ×~1.75, prelight ×~0.87, night set ×~0.86 via c20/c23 on building pipes only), after a texture check; (b) drop P4. **Chosen: (a)** (user, 2026-09-24). Details: findings "Phase 5". Original text follows.
 
 **P4 — Building ambient (phase 4).** Find the `SetVertexShaderConstant` upload of ambient in pipe `0x53F20096` (VS 0x3C9DA8/0x3C9E90, creator ~0x167B7A; also 0x9E/0xA0/0xA2 via check 0x1688ED). Scale ×2 [H5]. Only if hue-neutral dark-area captures still differ: move the ambient add after matCol and use VS `×0.5` + stage `MODULATE2X`, which is a microcode edit.
 
@@ -278,7 +280,7 @@ SA-PS2Atmosphere/
 - Radiosity performance at 480p on NV2A (low risk; PS2 did it at ½ res).
 - ~~H4 intensity scale~~ resolved: /255.
 - PCSX2 blending inaccuracy contaminating the reference.
-- The Xbox building pipe formula is inferred from SkyGfx's reimplementation, not yet from Xbox microcode.
+- ~~The Xbox building pipe formula is inferred from SkyGfx's reimplementation, not yet from Xbox microcode~~ resolved: decoded from the Xbox VS blobs (§11, item 5).
 - Only USA Rev 1 is supported; other XBE revisions need re-anchoring (the patcher refuses by hash).
 
 ## 18. Implementation phases / prioritized roadmap
@@ -297,9 +299,10 @@ SA-PS2Atmosphere/
 - **Phase 6 — Optional polish.** Foliage dual pass, grass ambient, the gamma/display filter investigation (RE target 7).
 - **Phase 7 — Distribution.** xdelta + patcher + README; test on a clean Rev 1 copy in xemu (and real hardware if available).
 
-### Current state and next session (2026-09-24)
+### Current state and next session (2026-09-24 – 2026-09-25)
 
 - **Builds:** `dist/default_p1p5.xbe` (P1 + P5; sha1 9c4db1ab…) → `work/xbox/gtasa_p1p5.xiso`, boot-tested. `dist/default_p1.xbe` / `gtasa_p1.xiso` are kept. `dist/default_p2p5.xbe` (P2 + P5; sha1 ed5c41e3…) → `work/xbox/gtasa_p2p5.xiso` (embedded stream.ini pe 8), boot-tested ✅.
+- **Disk cleanup (2026-09-25):** only `gtasa_stock.xiso` and `gtasa_p2p3p4p5.xiso` (v0.4) are kept. The v0.2/v0.3 ISOs and the Cxbx copy `work/xbox/game/` are deleted. To rebuild one, copy `gtasa_stock.xiso`, write `dist/default_*.xbe` at sector 348678 and the matching `work/xbox/stream_*.ini` at sector 1998977 (same sizes). For Cxbx, re-copy the extracted Xbox folder to `work/xbox/game/`.
 - **Test saves:**
   - xemu HDD: slots 1–3. Slot 2 = EU "Ryder", converted and verified in-game. Slot 1 (2026-09-24) = the same save re-saved by the user with brightness 256 (the genuine v2 "Big Smoke" save that was there is gone from the HDD; the original is still in `xbox_hdd.qcow2.bak_20260924`). It stores brightness 384; set 256 in Options → Display, or with `work/session_tools/xbright.py 256`. Original HDD backed up as `E:\Emuladores\xemu\xbox_hdd.qcow2.bak_20260924`.
   - PCSX2 `Mcd001.ps2` slot 1: "Tagging up Turf", native v3.00 (backup `Mcd001.ps2.bak_20260924`; `mymcplus` is installed via pip).
