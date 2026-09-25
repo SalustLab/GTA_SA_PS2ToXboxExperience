@@ -2,7 +2,7 @@
 
 Legend: **[C]** Confirmed (read from bytes/source), **[S]** Strongly inferred, **[H]** Hypothesis requiring testing.
 
-> **Status 2026-09-24:** Phases 0–2 are done (E0, E3, E4, P1 booted). Phase 3 is done (P2 blur, v0.2 candidate `gtasa_p2p5.xiso`). Phase 4 is done (P3 radiosity, v0.3 candidate `gtasa_p2p3p5.xiso`). Phase 5: RE target 5 is done, P4 is built and verified live (E7). As planned (ambient ×2) it makes fidelity worse. **Decision (user, 2026-09-24): option (a), a 2-parameter P4, with the texture check first** (§9 P4, §18 next session). Corrections from live measurement are marked **(2026-09-24)** below; the evidence is in `docs/findings.md`.
+> **Status 2026-09-25:** Phases 0–5 are done. v0.2 = `gtasa_p2p5.xiso` (P2 blur), v0.3 = `gtasa_p2p3p5.xiso` (P3 radiosity), **v0.4 candidate = `gtasa_p2p3p4p5.xiso`** (P4 v2 building lighting G 0.91 / N 0.80 / KA 1.80, boot-tested and signed off 2026-09-25). The night-ground gap that remains is the Xbox asphalt texture, accepted as asset content (user, option a). Next: Phase 6 (optional polish) or Phase 7 (distribution). Corrections from live measurement are marked **(2026-09-24)** below; the evidence is in `docs/findings.md`.
 Xbox addresses are VAs in `default.xbe` USA Rev 1 (SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5`). File offset = VA − 0x10000 (.text), VA − 0xFB60 (.data), VA − 0x10280 (.rdata). Any .data VA ≥ 0x3D2C04 is BSS (zero at boot).
 
 Routing evidence:
@@ -293,7 +293,7 @@ SA-PS2Atmosphere/
 - **Phase 2 — P1 ColourFilter (E4).** ✅ E4 passed, v0.1 candidate booted (`work/xbox/gtasa_p1.xiso`); in-game interior check ✅ (2026-09-24, CJ house, 100% within ±2 outside animated pixels, HUD intact); night check ✅ (Grove St 00:00, 98.6% within ±2 on filtered pixels); P5 built and boot-tested (`gtasa_p1p5.xiso`); pause-menu check ✅ (ColourFilter not called in menus; identical to stock). **Phase 2 closed 2026-09-24.** RE targets 1–3, then patch, then the deterministic loop. **This alone delivers the core orange atmosphere.** Ship-able milestone v0.1.
 - **Phase 3 — P2 blur (E5)** + ini offsets 8 → v0.2. **In progress:** RE target 3a done; P2 built, live RAM test ✅, E5 ✅ [S] (2026-09-24). Boot test ✅ (`gtasa_p2p5.xiso`, 99.0 % within ±2, HUD intact); visual sign-off ✅. **Phase 3 closed 2026-09-24.**
 - **Phase 4 — P3 radiosity (E6).** RE target 4, then Initialise raster + rewrite + ini `pe_bRadiosity 1`, then calibrate against PS2 (H4) → v0.3. **In progress (2026-09-24):** P3 built without a new raster (camera switch into the copy's off-screen strip); PS2 calibration ✅ (H4 = /255); live RAM test ✅ (100 % within ±2 on all three paths). Boot test ✅ (100 % within ±2); pause-menu check ✅ (not called in menus); visual sign-off ✅. **Phase 4 closed 2026-09-24.**
-- **Phase 5 — P4 building ambient (E7)** → v0.4, only if dark-scene metrics still diverge. **In progress (2026-09-24):** RE target 5 ✅; H5 mechanism ✅ (PS2 ambient ~2× relative to prelight); P4 built + E7 live ✅ (exactly 2×, vehicles untouched). Natural-scene check ❌: ambient ×2 alone overshoots (night stock ≈ PS2). **Decision (2026-09-24): 2-parameter P4** (ambient + prelight scale), texture check first. Texture/data checks ✅ (equal); PS2 display chain identified (16-bit + merge, reference only); P4 v2 (G/N/KA) built + live ✅, facade matched; night ground +10–20 % open. Harness: `idlecam off` on both consoles.
+- **Phase 5 — P4 building ambient (E7)** → v0.4, only if dark-scene metrics still diverge. **In progress (2026-09-24):** RE target 5 ✅; H5 mechanism ✅ (PS2 ambient ~2× relative to prelight); P4 built + E7 live ✅ (exactly 2×, vehicles untouched). Natural-scene check ❌: ambient ×2 alone overshoots (night stock ≈ PS2). **Decision (2026-09-24): 2-parameter P4** (ambient + prelight scale), texture check first. Texture/data checks ✅ (equal); PS2 display chain identified (16-bit + merge, reference only); P4 v2 (G/N/KA) built + live ✅, facade matched; night ground +10–20 % open. Harness: `idlecam off` on both consoles. Ground investigated (2026-09-25): DN pipe, the residual is the texture (accepted); boot test ✅ (`gtasa_p2p3p4p5.xiso`); visual sign-off ✅. **Phase 5 closed 2026-09-25.**
 - **Phase 6 — Optional polish.** Foliage dual pass, grass ambient, the gamma/display filter investigation (RE target 7).
 - **Phase 7 — Distribution.** xdelta + patcher + README; test on a clean Rev 1 copy in xemu (and real hardware if available).
 
@@ -323,8 +323,16 @@ SA-PS2Atmosphere/
   2. **Alpha decal layers.** `hub_grnd_alpha`/`hubst4alpha` are blended over the ground. Compare the ground with the decal models hidden, or check whether the PS2 draws them differently.
   3. **Night lamp pools.** At 00:00, exclude the areas lit by street lamps (pointlight/shadow textures) and refit n/ka on the unlit ground only.
   4. **Refit** with `p4fit.py` (env `BOX=y0,y1,x0,x1`) on `captures/p4v2_{night,noon}` and `captures/p4v2_fid_*`. Then set per-pipe parameters if the ground is a separate pipe, or else fold the finding into the model. Then live re-check, boot test and ISO.
+  - **Ground status (2026-09-25):** steps 1–4 done (findings "Ground investigation").
+    - The ground is drawn by DN blobs (89 %), so it gets G/N/KA.
+    - The residual is the Xbox asphalt texture (`plaintarmac1` 0.92 PS2/Xbox), accepted as asset content (user, option a).
+    - About 7 % remains, at night only: a dark-end loss in the PS2 colour path [H], not specific to the ground.
+    - Lamp pools, radiosity and registration are refuted.
+    - P4 v2 keeps G 0.91 / N 0.80 / KA 1.80.
+    - Boot test ✅ (2026-09-25): `work/xbox/gtasa_p2p3p4p5.xiso` (sha1 2d98911b…) matches the live poke. Facade PS2/disp(Xbox) is 1.06/1.05/1.03 at 00:00 and 1.01/1.04/1.05 at 12:00.
+    - Visual sign-off ✅ (user, 2026-09-25). Phase 5 closed; v0.4 candidate = `gtasa_p2p3p4p5.xiso`.
   - Tools (in `work/`, not committed): `session_tools/ps2disp.py` (PS2 display model, selftest), `p4fit.py`, `vsc.py`, `ps2entry.py`, `imgtool.py`; `work/tex/txdmean.py`, `prelight.py`, `pmatch.py`.
-- **Session start checklist:** run `idlecam off` on both consoles; check the xemu pad is connected (a black "reconnect controller" frame means it isn't); P4 stays off in RAM (`p4live.py state`).
+- **Session start checklist:** run `idlecam off` on both consoles; check the xemu pad is connected (a black "reconnect controller" frame means it isn't); check P4 with `p4live.py state` (on the v0.3 ISO it stays off; the v0.4 ISO `gtasa_p2p3p4p5.xiso` boots with it on).
 
 ## Execution context (for any executor)
 
