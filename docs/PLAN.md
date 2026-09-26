@@ -2,7 +2,9 @@
 
 Legend: **[C]** Confirmed (read from bytes/source), **[S]** Strongly inferred, **[H]** Hypothesis requiring testing.
 
-> **Status 2026-09-25:** Phases 0–5 are done. v0.2 = `gtasa_p2p5.xiso` (P2 blur), v0.3 = `gtasa_p2p3p5.xiso` (P3 radiosity), **v0.4 candidate = `gtasa_p2p3p4p5.xiso`** (P4 v2 building lighting G 0.91 / N 0.80 / KA 1.80, boot-tested and signed off 2026-09-25). The night-ground gap that remains is the Xbox asphalt texture, accepted as asset content (user, option a). Next: Phase 6 (optional polish) or Phase 7 (distribution). Corrections from live measurement are marked **(2026-09-24)** below; the evidence is in `docs/findings.md`.
+> **Status 2026-09-25 (Phase 6):** Phases 0–6 are done. **v0.5 candidate = `gtasa_p2p3p4p5p6b.xiso`** (v0.4 + P6b building-pipe dual pass, PS2 alpha-test semantics; boot-tested and signed off). Phase 6 also closed display filters (no patch), grass (P6c rejected by the user) and heat haze (present; the gap was a harness artefact). Next: Phase 7 (distribution).
+>
+> **Earlier status 2026-09-25:** Phases 0–5 are done. v0.2 = `gtasa_p2p5.xiso` (P2 blur), v0.3 = `gtasa_p2p3p5.xiso` (P3 radiosity), **v0.4 candidate = `gtasa_p2p3p4p5.xiso`** (P4 v2 building lighting G 0.91 / N 0.80 / KA 1.80, boot-tested and signed off 2026-09-25). The night-ground gap that remains is the Xbox asphalt texture, accepted as asset content (user, option a). Next: Phase 6 (optional polish) or Phase 7 (distribution). Corrections from live measurement are marked **(2026-09-24)** below; the evidence is in `docs/findings.md`.
 Xbox addresses are VAs in `default.xbe` USA Rev 1 (SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5`). File offset = VA − 0x10000 (.text), VA − 0xFB60 (.data), VA − 0x10280 (.rdata). Any .data VA ≥ 0x3D2C04 is BSS (zero at boot).
 
 Routing evidence:
@@ -78,7 +80,8 @@ The minimum viable mod is therefore **a `default.xbe` binary patch plus a 3-line
 | **Filter blur** | offsets 8 → ½ px, linear (PS2 globals 0x668D28 [C]) | offsets unused; NEAREST [C] | `m_bBlurColourFilter` | **P2 built** (UV offsets + LINEAR) + ini 8 |
 | Dark-area boost | basemult 0.4, rate 0.0008 | 0.5 / 0.0005 (exe default 1.0) [C] | same code | **ini only** |
 | Building ambient/2× | ambient ≈×2 relative to prelight [C, sweep]; prelight ~0.87× day / ~0.75× night vs Xbox [S] | `(prelight·surfDiff + ambient·surfAmb)·matCol` [C, VS decoded] | `ps2ModulateBuilding` | **P4 v2 done** (G 0.91 / N 0.80 / KA 1.80, building pipes only) |
-| Foliage alpha | dual-pass-like | unknown [H] | `dualPass` | optional phase 5 |
+| Foliage alpha | GS TEST AFAIL FB_ONLY, AREF 64/128 [C] | GREATER 100/140, fail discarded [C] | `dualPass` | **P6b** dual pass (building pipes) |
+| Grass alpha (2026-09-25) | `plants.dat` A read as /128 (GS) [S] | same byte read as /255 → half as opaque [C] | `grassPS` ×255/128 | none (P6c built, rejected by the user; opt-in) |
 | Fog / sky | timecyc | same code path [S] | engine default | none |
 | Vehicles | PS2 env/spec | Xbox spec pipe | selectable | **keep Xbox** |
 | Draw distance | shorter LODs | 1,830 LODs longer [C] | — | keep Xbox |
@@ -192,7 +195,7 @@ Resolved 2026-09-24 (details in `docs/findings.md`):
 - **1.** `0x24BB7B` is a render pass into the postfx camera (not CopyRects). The copy is 1024×512 X8R8G8B8 swizzled; the backbuffer is LIN_X8R8G8B8 640×480.
 - **2.** Texture-stage layout (see §9).
 - **6.** Clock / weather / player on both platforms, plus CTimer timeScale (Xbox 0x56B9AC, PS2 0x66C1A8).
-- **7.** SetGammaRamp: see §5.
+- **7.** SetGammaRamp: see §5. Flicker / soft display filter (2026-09-25): the game never calls them; D3D init sets the XDK defaults (flicker 5 at 0x3637FF, soft display off at 0x363828). SDTV encoder only, no patch (findings "Phase 6A").
 
 Other anchors found:
 - D3D device `[0x36E278]`: PS `+0x784`, VS `+0x794`, gamma ramps `+0x1C28+0x1DC`.
@@ -296,7 +299,7 @@ SA-PS2Atmosphere/
 - **Phase 3 — P2 blur (E5)** + ini offsets 8 → v0.2. **In progress:** RE target 3a done; P2 built, live RAM test ✅, E5 ✅ [S] (2026-09-24). Boot test ✅ (`gtasa_p2p5.xiso`, 99.0 % within ±2, HUD intact); visual sign-off ✅. **Phase 3 closed 2026-09-24.**
 - **Phase 4 — P3 radiosity (E6).** RE target 4, then Initialise raster + rewrite + ini `pe_bRadiosity 1`, then calibrate against PS2 (H4) → v0.3. **In progress (2026-09-24):** P3 built without a new raster (camera switch into the copy's off-screen strip); PS2 calibration ✅ (H4 = /255); live RAM test ✅ (100 % within ±2 on all three paths). Boot test ✅ (100 % within ±2); pause-menu check ✅ (not called in menus); visual sign-off ✅. **Phase 4 closed 2026-09-24.**
 - **Phase 5 — P4 building ambient (E7)** → v0.4, only if dark-scene metrics still diverge. **In progress (2026-09-24):** RE target 5 ✅; H5 mechanism ✅ (PS2 ambient ~2× relative to prelight); P4 built + E7 live ✅ (exactly 2×, vehicles untouched). Natural-scene check ❌: ambient ×2 alone overshoots (night stock ≈ PS2). **Decision (2026-09-24): 2-parameter P4** (ambient + prelight scale), texture check first. Texture/data checks ✅ (equal); PS2 display chain identified (16-bit + merge, reference only); P4 v2 (G/N/KA) built + live ✅, facade matched; night ground +10–20 % open. Harness: `idlecam off` on both consoles. Ground investigated (2026-09-25): DN pipe, the residual is the texture (accepted); boot test ✅ (`gtasa_p2p3p4p5.xiso`); visual sign-off ✅. **Phase 5 closed 2026-09-25.**
-- **Phase 6 — Optional polish.** Foliage dual pass, grass ambient, the gamma/display filter investigation (RE target 7).
+- **Phase 6 — Optional polish.** Foliage dual pass, grass ambient, the gamma/display filter investigation (RE target 7). **In progress (2026-09-25):** plan = diagnose first, patch only on a confirmed difference (6A display → 6C grass → 6B foliage). 6A ✅ RE target 7 resolved, no patch (findings "Phase 6A"). 6C ✅ mechanism [S]: the PS2 GS reads the grass alpha (`plants.dat` column A) with 128 = 1.0, the Xbox with 255, so the Xbox grass is half as opaque; RGB ×2 (SkyGfx) refuted. **P6c** (data-only `plants.dat` A → min(2A, 255)) built and boot-tested, **rejected on visual sign-off** (user prefers the v0.4 grass); generator removed (the transform is in findings "Phase 6C"). Release candidate stays v0.4. 6D ✅ heat haze: present and matching on the Xbox (user visual check); the "missing" haze was the frozen clock holding the ramp `0x74AEE0` at 0 (findings "Heat haze"). 6B: H6a ✅ [C] (PS2 GS TEST AFAIL FB_ONLY, AREF 64/128; Xbox GREATER 100/140, discard); **P6b** building-pipe dual pass (`patches/p6b_dualpass.py`, cave 0x24F00C in P2's dead ColourFilter body, `requires` P2), visual sign-off ✅ live; boot test ✅ (opaque geometry, P4 facades and HUD unchanged; pause menu 0 px). **Phase 6 closed 2026-09-25.** v0.5 candidate `work/xbox/gtasa_p2p3p4p5p6b.xiso` (XBE sha1 2d1829b5…). Grass anchors [C]: `CPlantMgr::Initialise` 0x16D239, per-plant draw loop 0x16B8A8 (colour `>>8` at 0x16B9E5, atomic render `call [edi+0x48]` at 0x16BA28).
 - **Phase 7 — Distribution.** xdelta + patcher + README; test on a clean Rev 1 copy in xemu (and real hardware if available).
 
 ### Current state and next session (2026-09-24 – 2026-09-25)

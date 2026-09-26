@@ -8,7 +8,9 @@ Patch JSON:
   {"name": "P1 ColourFilter", "patches": [
      {"va": "0x24F007", "orig": "55 8B EC", "new": "90 90 90", "note": "..."}]}
   "orig_sha1" (SHA1 of the original bytes, same length as "new") may replace "orig", so
-  committed patch files carry no Rockstar bytes.
+  committed patch files carry no Rockstar bytes. An optional top-level "requires": ["p2_filterblur"]
+  names patch files (by stem) that must be applied in the same run (e.g. code placed in bytes another
+  patch makes dead).
 
 VAs are mapped to file offsets through the XBE section headers. The tool refuses:
 wrong input SHA1, a VA outside a section's raw data (BSS), overlapping entries,
@@ -43,10 +45,21 @@ def va_to_offset(secs, va, length):
     raise ValueError(f"VA {va:#x}+{length} is not inside any section's file data (BSS or unmapped)")
 
 
+def check_requires(docs):
+    """docs = [(file stem, parsed JSON)]. A patch may list the stems of patches it depends on in "requires"."""
+    stems = {s for s, _ in docs}
+    for s, j in docs:
+        missing = [r for r in j.get("requires", []) if r not in stems]
+        if missing:
+            raise ValueError(f"{s} requires {', '.join(missing)} in the same run")
+
+
 def load_entries(paths):
     entries = []
-    for p in paths:
-        for e in json.loads(Path(p).read_text())["patches"]:
+    docs = [(Path(p).stem, json.loads(Path(p).read_text())) for p in paths]
+    check_requires(docs)
+    for p, (_, j) in zip(paths, docs):
+        for e in j["patches"]:
             new = bytes.fromhex(e["new"])
             orig = e["orig_sha1"].lower() if "orig_sha1" in e else bytes.fromhex(e["orig"])
             if not new or (isinstance(orig, bytes) and len(orig) != len(new)):
@@ -112,6 +125,12 @@ def selftest():
     assert refused([(0x11002, hashlib.sha1(b"\xFF\x03").hexdigest(), b"\x90\x90", "t")])   # orig_sha1 mismatch
     assert refused([(0x11002, b"\x02\x03", b"\x90\x90", "a"),
                     (0x11003, b"\x03", b"\x90", "b")])                        # overlap
+    check_requires([("p2", {}), ("p6b", {"requires": ["p2"]})])
+    try:
+        check_requires([("p6b", {"requires": ["p2"]})])                       # dependency missing
+        raise AssertionError("missing requirement accepted")
+    except ValueError:
+        pass
     print("xbe_patch selftest OK")
 
 

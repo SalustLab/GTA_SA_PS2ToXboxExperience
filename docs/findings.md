@@ -651,3 +651,175 @@ Symbols come from the Cxbx-Reloaded symbol cache (`E:\Emuladores\Cxbx-Reloaded\S
   - Mean |1 − ratio|: facade night 0.35 → 0.05, noon 0.03 → 0.03; ground night 0.18 → 0.14, noon 0.14 → 0.07.
 - Harness note: `p4fid.py` leaves `timescale 0`, which also freezes the camera. Set `timescale 1` before asking the user to reframe.
 - **Visual sign-off (user, 2026-09-25) ✅** on `captures/p4v2_boot2_{night,noon}/_grid.png` and live. **Phase 5 is closed**; v0.4 candidate = `gtasa_p2p3p4p5.xiso`.
+
+## 2026-09-25 — Phase 6A: RE target 7 (display filters)
+
+- **Question:** does the Xbox game set a flicker or soft-display filter that could stand in for the PS2's 2-line display merge (Phase 5, `ps2disp.py`)?
+- **Result [C] (static, `default.xbe`):**
+  - `D3DDevice_SetFlickerFilter` (Cxbx symbol cache 0x35F820) = `AvSendTVEncoderOption(dev+0x1C28, 0xB, esi, 0)`, cached in 0x36F134/0x36F13C. Its only caller is D3D device init: `mov esi, 5; call 0x35F820` at 0x3637FF (the XDK default, 5).
+  - `SetSoftDisplayFilter` is inlined in the same init: `AvSendTVEncoderOption(dev+0x1C28, 0xE, 0, 0)` at 0x363828–0x36382F, i.e. **off**.
+  - Every other `call [0x375408]` (AvSendTVEncoderOption) is D3D-internal: option 6 (0x35FC19, 0x35FCE5, 0x36617C), 9 (0x363A6E, 0x36504C) and 0x10 (0x369525). No game code calls either filter API.
+- **Reading:** the game ships the XDK defaults (flicker 5, soft display off). Both options act on the SDTV video encoder only, so they have no effect at 480p and are not emulated by xemu or Cxbx.
+- **Verdict:** RE target 7 resolved. **No patch**: turning the soft display filter on (`push 0` → `push 1` at 0x363829) would be SDTV-hardware-only and unverifiable here, and the PS2 display chain is reference only (user decision, 2026-09-24). Listed as an optional hardware-only note for the Phase 7 README.
+
+## 2026-09-25 — Phase 6C: grass, static RE and asset check
+
+- **Xbox `CPlantMgr` [C]:**
+  - `CPlantMgr::Initialise` 0x16D239 (caller 0x154321) loads `models\grass\plant1.txd` (string 0x38B270) into TXD slot `grass_pc` (0x38B118).
+  - Textures: `txgrass0_0…0_3` go to 0x5F29B4…0x5F29C0 (set 0, pointer 0x5F29F4/0x5F29FC) and `txgrass1_0…1_3` to 0x5F29C4…0x5F29D0 (set 1, pointer 0x5F29F8/0x5F2A00); 0x38B204 goes to 0x5F2A54.
+  - Model sets: `grass0_1…0_4` → 0x5F2A04 and `grass1_1…1_4` → 0x5F2A14. They are loaded by 0x16D168.
+- The model loader clears the geometry flags PRELIT, NORMALS and LIGHT (`and ~0x38`) and sets MODULATEMATERIALCOLOR (`or 0x40`) at 0x16D1D9. So **Xbox grass is unlit**: out = tex · matCol, with no ambient and no directional term [C]. This is the same as PC SA.
+- **Per-plant draw loop** 0x16B8A8 (stride 0x5C, caller 0x16BABA):
+  - material colour = plant colour `+0x40..0x42` × intensity `+0x44`, `>> 8` (0x16B9E5–0x16BA0F);
+  - set on all materials through 0x16B889 → callback 0x16B865;
+  - then `call [edi+0x48]` (the RpAtomic render callback) at 0x16BA28.
+  - The distance fade reads `[0x3CAF9C]`.
+- **PS2 `CPlantMgr` (INIT.NM strings near 0x151D0) [C]:** textures `txgrassbig0`/`txgrassbig1` from TXD `particle`, and **four** model sets `grass0_1…grass3_4`, plus `PLANTS.DAT`. The Xbox uses the PC grass assets instead: the `grass_pc` TXD with 8 textures of 64×64, and two model sets. The PS2 assets are **already on the Xbox disc**: `models/grass/grass2_*.dff` and `grass3_*.dff`, and `txgrassbig0/1` inside `models/particle.txd`, whose texels have the same opaque-pixel means as the PS2's (the channel order differs only because of the decoder). The grass DFFs are byte-size-identical on both consoles.
+- Texture means (opaque pixels): PS2 `txgrassbig0` 87/91/51 and `txgrassbig1` 120/121/106; Xbox `txgrass0_0…0_3` 82–92 / 83–99 / 34–65 and `txgrass1_0…1_3` 105–138 / 103–140 / 80–138. Comparable brightness, different art.
+- **SkyGfx @926616a3 (`src/main.cpp`, `shaders/ps/grassPS.hlsl`):**
+  - PS2 grass is `tex · matCol · 255/128` (`ps2ModulateGrass`, default = `ps2ModulateGlobal`);
+  - `dualPassGrass` (default = `dualPassGlobal`) draws Z-write alpha ≥ ref first, then alpha < ref with Z-write off;
+  - `grassAddAmbient` is an **optional, default-off** hack (it adds the timecyc ambient to the colour before the intensity `>>8`);
+  - grass backface culling is on by default; there is also a far-distance tweak to 78.0 and an unused `ps2grassFiles` option.
+- **Re-ranked hypotheses:**
+  - **H7b** (PS2 ×2 modulate) first. Prediction: PS2/disp(Xbox) on grass pixels ≈ 2 in unclamped areas.
+  - **H7a** (ambient) second.
+  - **H7d (new)**: the grass look also differs in assets (PS2 texture/model set). That is PLAN §8 territory ("do not port PS2 textures or models"), although here it would only be a pointer/string patch to files already on the Xbox disc.
+- **Decision (user, 2026-09-25): shading only.** The Xbox keeps its grass assets (consistent with PLAN §8 and the asphalt decision). Phase 6C tests and patches only the engine difference: ×2 modulate (H7b), then ambient (H7a).
+
+## 2026-09-25 — Phase 6C: grass live tests (E8b, Glen Park)
+
+- **Scene:** both consoles at (1970, −1180, ~23.5) Glen Park LS, weather 0, `timescale 0`, `idlecam off`; Xbox = v0.4 ISO (P4 on, identity ramp). Framing matches closely (the PS2 camera sits a little higher).
+- **Grass masks (both consoles) [C]:**
+  - Xbox: `work/session_tools/grass.py off` makes the per-plant draw loop 0x16B8A8 return at once.
+  - PS2: `ps2grass.py off` puts `jr $ra` at the PS2 `CPlantMgr` render **0x489870** (SLUS_209.46). That function was found via `CPlantMgr::Initialise` 0x89CBB0 in INIT.NM (called at 0x88F170), which stores `txgrassbig0/1` at 0x846970/0x846974 and the atomic tables at 0x846980/0x846F80 (4 sets → 2 tables). It sets states zwrite/ztest/vtxalpha, SRCALPHA/INVSRCALPHA and filter LINEAR, and builds the geometry on VU0 (no RpAtomic).
+  - PCSX2 picks up the code poke immediately.
+  - Captures: 3× alternating on/off per console. Mask = |median on − median off| > 12 and > 4× the frame spread. Tools: `grasscap.py`, `grassfit.py` (Xbox through `disp()`), `grassvar.py`.
+- **Xbox grass lighting [C]:** `CPlantMgr::Render`, loop 0x16BE9C. Per triangle, `CColLighting` byte +0x47 (day low nibble, night high nibble) gives `L = (day·(1−b) + night·b) · (1/30) · 255` (pool 0x390DB0 = 1/30, 0x3909E8 = 255; b = `[0x3C9DA4]`, the same DN balance as the buildings). Then plant colour × L `>> 8` (0x16BF61); the entry is added through 0x16B822; the draw loop applies × intensity `>> 8`. So L ≤ 127 = the PS2 GS 1.0 range.
+- **Draw colours read live at 00:00 (breakpoint 0x16BA12):** RGB 3–22 (the lawn triangles mostly have night nibble 0, so L = 0 and the blades are near black on both consoles), **alpha 0x28 = 40** (faded plants 7–31).
+- **H7b (SkyGfx ×255/128 on RGB) — refuted as the main effect.** Noon, stock: grass PS2/disp(Xbox) = 0.94/1.04/1.01 (equal).
+- **Night gap [C]:** grass/ground luminance PS2 0.34 vs Xbox 0.56 (the PS2 grass covers the lawn more darkly). The night-weight test (N_g 0.45–1.0 through an operand repoint at 0x16BF4C) changes nothing, because the night nibble is 0. **H7e (night lighting) refuted.**
+- **Mechanism [S]:** the plant alpha byte 40 means 40/255 = 0.16 in D3D but 40/128 = 0.31 on the PS2 GS (128 = 1.0). The Xbox port doubles the PostFX timecyc alphas for this reason (PLAN §1), but not the grass alpha.
+- **Live variants** (`grassmod.py`; a cave in P3's 0xCC padding 0x24E360+ doubles bytes of the draw colour with a 255 clamp, site 0x16BA12 `call cave; nop×4`). Grass/ground luminance ratio (1 = invisible grass):
+
+| Variant | 00:00 (PS2 0.338) | 12:00 (PS2 0.699) |
+|---|---|---|
+| stock | 0.559 | 0.756 |
+| **A: alpha ×2** | **0.426** | **0.670** |
+| C: RGB ×2 | 0.578 | 0.829 |
+| AC: both | 0.452 | 0.780 |
+
+- **Reading:** A is closest at both hours (it closes ≈ 60 % of the night gap and overshoots the noon gap slightly: 0.670 vs 0.699). RGB ×2 moves noon away from the PS2, so the PS2 grass RGB is not effectively doubled [S]. The residual is consistent with the different grass assets (PS2 `txgrassbig` 64×256 vs Xbox `txgrass` 64×64; different density and placement: Xbox mask 3.7 % vs PS2 1.0 % at noon), which are kept by decision. Absolute grass colour PS2/disp(Xbox) favours stock/AC at noon, but it is confounded by the lawn itself differing (ground PS2/disp(Xbox) 0.99/1.12/1.30).
+- **Verdict: H7 (PS2 grass alpha = 2× Xbox) supported [S]; RGB ×2 refuted.** Visual grid: `captures/grass_glen_noon2/_grid.png`.
+- **Decision (user, 2026-09-25): build P6c = alpha ×2.**
+- **Source of the alpha [C]:** it is the `plants.dat` colour column **A** (Xbox == PS2 file except 2 ModelID fields; values 16–200, mostly 40/50). It is parsed into definitions at 0x5F2EB0–0x5F428C (RGBA dword, stride 0x28). Live, `work/session_tools/plantsa.py x2` sets A = min(2A, 255) in those RAM definitions and gives **the same frame as the draw-time cave** (0.15 % of pixels > 4 vs 5.57 % against stock; grass/ground 0.670 = cave A). The fade path already clamps to 255 (0x16B985); the near path uses A as-is, and the file's A > 127 rows must clamp (310 would wrap as a byte).
+- No free code cave exists outside the committed patch JSONs (no ≥ 24-byte 0xCC run in `.text`; the P3 padding belongs to P3's JSON entry, and `xbe_patch.py` refuses overlaps). So **P6c is data-only** and the XBE is untouched.
+- **P6c as built (`patches/p6c_grass_alpha.py`):** `work/xbox/plants.dat` (stock sha1 5576de10…) → `work/xbox/plants_p6c.dat` (sha1 7588d60b…, same 9887 B: a field that gains a digit takes one tab from the separator before it). The selftest checks the line transform, the clamp, comment lines, and, on the local stock copy, that only column A changes.
+- **v0.5 candidate:** `work/xbox/gtasa_v05.xiso` = a copy of `gtasa_p2p3p4p5.xiso` (stock `plants.dat` verified at sector 1999020 first) with `plants_p6c.dat` written in place. The embedded XBE is unchanged (2d98911b…). Boot test pending.
+- **Heat haze (user question) [C]:** `CPostEffects::HeatHaze` 0x24D7E2 is present on the Xbox, with one call in PostFX Render at 0x24CE9F. It is gated by the weather heat-haze intensity `[0x5E62B4]` against `[0x5F4BCC]` (or a force flag). It is never active in the LS weather-0 test scenes. PS2 parity untested [H]: candidate 6D.
+
+## 2026-09-25 — Heat haze "missing on Xbox" = harness artefact (frozen clock)
+
+- **Report (user):** at Glen Park 12:00, weather 0, the PS2 shows heat haze and the Xbox does not.
+- **Xbox gate (PostFX Render 0x24CE3E–0x24CEA5) [C]:**
+  - force byte `[0x5F4B09]` → HeatHaze(1.0);
+  - otherwise, if `HeatHazeFXControl` `[0x5E62B8]` > 0 (or flag `[0x608AF8]`), it calls `CPostEffects::HeatHaze` 0x24D7E2 with intensity `CWeather::HeatHaze` `[0x5E62B4]`.
+  - Live: control 1.0, but **intensity 0.0**.
+- **Where the intensity comes from [C]:** `CWeather::Update` 0x260908–0x260A5D. The control is 1 for weather 0/0xB/0x11/0x12 (old or new). The intensity is a ramp `[0x74AEE0]` (0..1) × the control.
+  - The ramp moves **only when the game minute changes** (0x260972: minute `[0x55F3DE]` vs last `[0x3D2B40]`): +0.05 `[0x3CE788]` per minute inside hours [10, 19) (`[0x3CE780]`/`[0x3CE784]`), and −0.5 `[0x3CE78C]` per minute outside them or in interiors.
+- **Cause:** `xemu_gdb.py clock` / `pcsx2_pine.py clock` freeze the minute (ms-per-minute 0x7FFFFFFF), so each console keeps whatever ramp it had when frozen. The Xbox had come from 06:00 → ramp 0. The PS2 still had its daytime ramp.
+- **Check:** ramp poked to 1.0 → HeatHaze 1.0, and the Xbox draws an animated edge distortion (5.7 % of pixels vs off; 6.4 % between two "on" frames 1 s apart, even at `timescale 0`). `captures/heathaze/`.
+- **Verdict:** the Xbox heat haze works; there is no missing effect. **Harness rule:** captures in 10:00–19:00 with weather 0/0xB/0x11/0x12 must set the ramp equally on both consoles (Xbox `0x74AEE0`; the PS2 address is still to be found), or let the clock run ≥ 20 game minutes before freezing. Earlier noon sets (Grove St, Glen Park) may carry a PS2-only haze. It is an animated edge shift, so it adds noise but no colour bias. PS2/Xbox haze parity (strength, shape) is untested [H] → 6D.
+- **Visual check (user, 2026-09-25) ✅:** with the Xbox ramp at 1.0, the Xbox heat haze looks the same as the PS2's live (Glen Park, 12:00, weather 0). **6D closed**: no patch.
+
+## 2026-09-25 — P6c boot test (`gtasa_v05.xiso`)
+
+- **Boot [C]:** v0.5 boots and slot 1 loads. The XBE blocks are live (P2 3/3, P3 1/1, P4 5/5, P5 1/1; unchanged from v0.4). All 61 parsed plant definitions carry the P6c alpha (0 stock-only values). Brightness 256, radiosity flag 1.
+- **Boot = live poke [C]** (Glen Park, the user reframed to the earlier view; Xbox heat-haze ramp 0 as in the live sets; A/B in the same session by writing the stock or P6c alpha into the RAM definitions with `work/session_tools/plantsab.py`). Grass/ground luminance:
+
+| | 12:00 | 00:00 |
+|---|---|---|
+| v0.5 P6c | **0.668** (repeat 0.668) | **0.432** |
+| stock alpha (v0.4) | 0.756 | 0.565 |
+| live cave A / stock (earlier) | 0.670 / 0.756 | 0.426 / 0.559 |
+| PS2 | 0.699 | 0.338 |
+
+- Harness note: with the Xbox haze ramp at 1 the noon ratio reads 0.608. The animated distortion enters the spread filter and biases the mask, so grass metrics need the same haze state on both consoles, or haze off on the Xbox, with the PS2 frames judged by eye.
+- Sign-off grid: `captures/grass_glen_noon_v05ab_p6c/_signoff_grid.png`.
+- **Decision (user, 2026-09-25): P6c rejected on visual sign-off.** The user prefers the v0.4 grass (stock alpha, middle column of the grid) to the more PS2-like P6c. **v0.4 stays the release candidate**; P6c is not shipped. `patches/p6c_grass_alpha.py` is kept as a documented, opt-in data patch (the mechanism finding stands [S]). `work/xbox/gtasa_v05.xiso` is not a candidate.
+
+## 2026-09-25 — Phase 6B: foliage alpha test (E8a), state RE on both consoles
+
+- **Hypotheses:**
+  - H6a: the PS2 GS AFAIL = FB_ONLY (failed pixels still write colour, but not Z) while the Xbox discards them;
+  - H6b: a different reference;
+  - H6c: no difference.
+- **PS2 [C]** (`work/ps2_ee_foliage.bin`, EE RAM from a PINE savestate, Glen Park 09:38; GIF A+D qwords with register 0x47/0x48 counted in the resident display lists):
+  - TEST_1 = **0x5140B** ×1107 and 0x3140B ×128: **ATE 1, ATST GEQUAL, AREF 64 (of 128 = 0.5), AFAIL FB_ONLY**, ZTE 1 (ZTST GEQUAL/GREATER);
+  - the ATE 0 variants carry the same fields;
+  - a few special draws use GREATER with AREF 8–51 (still FB_ONLY), and 6 use RGB_ONLY.
+  - So on the PS2 **no alpha-tested pixel is discarded**. Pixels below 0.5 are still blended into the colour buffer and only skip the Z write. This is exactly what SkyGfx's `dualPass` emulates.
+- **Xbox [C]** (`work/session_tools/alphalog.py`: breakpoints on the building setups 0x1675DF / 0x166C70 / 0x16A1E5; D3D simple render states at D3D_g_RenderState 0x36E288, indices 0x39–0x40 → NV2A DEPTH_FUNC, ALPHA_FUNC 0x36E370, BLEND_ENABLE 0x36E374, ALPHA_TEST_ENABLE 0x36E378, ALPHA_REF 0x36E37C, SFACTOR, DFACTOR, DEPTH_MASK 0x36E388; mapping from the method table 0x381BD0):
+  - building draws run with ALPHA_FUNC **GREATER**, ref **140 or 100** (plus 0–2), and z-write on;
+  - a failed pixel is discarded.
+  - The refs come from the game: `push 0x8C` (imm32) at 0x10507B (render-list pass, skipped when `[0x5F273C]` ≠ 0) and `push 0x64` at 0x266848 (per-entity, unless entity flag +0x12 & 8), both `RwRenderStateSet(30 = ALPHATESTFUNCTIONREF, …)`.
+  - (0x360610 DrawIndexedVertices only saw one 2D batch caller, 0x2A0F19. The 3D pipes do not go through the three symbol-cache draw entries, so the state is read at the setups.)
+- **Verdict: H6a confirmed [C]** (both consoles read from bytes and state). The Xbox cuts foliage at alpha 100/140 of 255 (0.39/0.55); the PS2 keeps every pixel, blended, and cuts only the Z write at 0.5.
+- **Live approximation** (`work/session_tools/aref.py 2`: both refs → 2; faint pixels are drawn and blended, but still write Z, so it is not the PS2 dual pass): 3.7 % of pixels change at Glen Park 09:38, mostly palm fronds and bush edges, which get softer and fuller. Crops: `captures/foliage_glen/_ref_zoom.png`. The faithful fix is a dual pass (pass 1: ref 128 with Z write; pass 2: alpha < 128 with Z write off). No free code cave is outside the committed JSONs (see "Phase 6C"), so a dual pass would have to live inside an existing patch's reserved bytes (P3's padding).
+- **Visual grid (user camera, Glen Park 09:38 on both, Xbox haze 0):** `captures/foliage_user/_signoff_grid.png` (PS2 | Xbox v0.4 | Xbox refs 2), plus the noon grid `captures/foliage_glen_noon/_signoff_grid.png`. The central palm crown is the same tree in all three: the PS2 fronds are thicker and softer; Xbox stock is thinner, with cut-out gaps; refs 2 are in between.
+- **Decision (user, 2026-09-25): dual pass** (technically the most correct: depth-correct solid part plus soft blended fringe, as the PS2 GS does in one pass with FB_ONLY).
+- **Draw path [C]:**
+  - building render CB (DN pipe) 0x167852 (registered by pointer at 0x167C04);
+  - per mesh: 0x166B49 (material → 0x16AFAD), 0x166EE3 (c20/c21), then the mesh helper 0x16AD9A (textures, then **the one draw**: `call 0x2A0F00` at 0x16AFA3);
+  - 0x2A0F00 = RW flush of deferred states 0x2A0230 + `D3DDevice_DrawIndexedVertices` 0x360610, return 0x2A0F19;
+  - 0x16AD9A has 5 building-pipe callers (0x167317, 0x167A55, 0x1680D2, 0x16864C, 0x16965A).
+  - `RwRenderStateGet` = `[0x75DE84]`; RW 3.6 states 8 ZWRITEENABLE, 29 ALPHATESTFUNCTION (2 LESS, 7 GREATEREQUAL; e.g. `push 7; push 0x1D` at 0x2166C2), 30 ALPHATESTFUNCTIONREF.
+- **P6b prototype (`patches/p6b_dualpass.py`, selftest OK, 220 B; live `work/session_tools/dualpass.py on`, cave in P3's padding 0x24E360):**
+  - site 0x16AFA3 → `call cave`;
+  - the cave flushes, and if D3D ALPHA_TEST_ENABLE and BLEND_ENABLE are both on: pass 1 GEQUAL 128 (Z write as set), pass 2 LESS 128 with Z write off, then restores the three RW states; otherwise it tail-jumps to the single draw.
+- **Live [C]:** the game runs; 10.9 % of pixels change at the palm scene (Glen Park 09:38, user camera). The changes are on the palm fronds (fuller and softer, visibly closer to the PS2 crown) and on a distant glass tower that now draws its below-ref pixels translucent instead of cut (PS2 FB_ONLY does the same); the smoke plume is animated noise. Grid: `captures/foliage_user/_dualpass_grid.png`; change mask `_dual_mask.png`.
+- **Visual sign-off (user, 2026-09-25) ✅ of the live dual pass** ("the dual-pass result is much better"; A/B toggled live).
+- **P6b as built:**
+  - `patches/p6b_dualpass.py` → `.json` (selftest OK). Cave = **0x24F00C–0x24F132**, the stock ColourFilter body that is dead under P2 (P2 writes only the 5-byte `jmp` at 0x24F007). A scan of every section finds no external rel32 jump/call and no absolute pointer into that range. 220 B are used.
+  - The JSON carries `"requires": ["p2_filterblur"]`; `tools/xbe_patch.py` gained `requires` (selftest OK) and refuses P6b without P2 (checked).
+  - The live prototype moved to the JSON bytes (`work/session_tools/dualpass.py`): same effect (8.0 % of pixels vs stock at a palm/bush view; 0.5 % dual vs dual).
+- **Build:** the P2 + P3 + P4 + P5 rebuild still gives sha1 2d98911b… (v0.4 unchanged by the patcher edit). `dist/default_p2p3p4p5p6b.xbe` sha1 **2d1829b5…** → `work/xbox/gtasa_p2p3p4p5p6b.xiso` (a copy of the v0.4 ISO with the XBE at sector 348678 replaced after checking it; stock `plants.dat`; `stream.ini` as v0.4). Boot test pending.
+
+## 2026-09-25 — Cleanup after Phase 6 (user: "delete all the trash")
+
+- Removed:
+  - the rejected P6c artefacts: `patches/p6c_grass_alpha.py`, `work/xbox/plants_p6c.dat` and `work/xbox/gtasa_v05.xiso`. The mechanism and the exact transform (A → min(2A, 255), keep the file size by trimming a tab) stay documented above;
+  - the scratch captures `captures/grass_scout`, `grass_glen_night_n0.*`, `grass_glen_noon_v05` and `foliage_json`;
+  - the session tools of rejected paths (`grassn.py`, `grassmod.py`, `grassvar.py`, `plantsa.py`, `plantsab.py`, `aref.py`).
+- Kept:
+  - every capture set cited above;
+  - `work/ps2_ee_foliage.bin`, the evidence for the PS2 TEST histogram;
+  - the harness tools `grass.py`, `ps2grass.py`, `grasscap.py`, `grassfit.py`, `alphalog.py`, `bphits.py` and `dualpass.py`.
+
+## 2026-09-25 — P6b boot test (`gtasa_p2p3p4p5p6b.xiso`)
+
+- **Boot [C]:** v0.5 boots and slot 1 loads. Live blocks: P2 3/3, P3 1/1, P4 5/5, P5 1/1, **P6b 2/2**. Brightness 256, radiosity flag 1, pe 8 ×4.
+- **A/B on the boot build** (`dualpass.py off/on` restores the stock bytes and re-applies the JSON bytes; heat-haze ramp 0; `timescale 0`):
+
+| Scene | dual vs stock (px > 8) | dual vs dual | what changes |
+|---|---|---|---|
+| Glen Park 09:38 | 1.67 % | 0.21 % | tree canopies, bushes, CJ idle outline |
+| Grove St 12:00 | 3.87 % | 0.23 % | palms/trees, power lines (thin alpha textures now continuous), CJ outline |
+| Grove St 00:00 | 2.04 % | 1.39 % | same, weaker |
+
+- Opaque geometry (road, house walls, the overpass, the P4-lit facades) is unchanged, and the HUD is intact. Files: `captures/p6b_boot_{glen,grove}/`.
+- Not done yet: the pause-menu check.
+- **Pause-menu check [C]** (Map tab): breakpoints at the P6b cave 0x24F00C and the site 0x16AFA3 never hit within 3 s each. The menu captured with dual pass on vs off: **0 pixels differ**; on vs on: 589 px, the blinking player marker. `captures/pause_menu_p6b/`.
+- **Phase 6 closed (2026-09-25).** v0.5 candidate = `work/xbox/gtasa_p2p3p4p5p6b.xiso` (P2 + P3 + P4 v2 + P5 + P6b; XBE sha1 2d1829b5…; stock `plants.dat`; `stream.ini` pe 8 + `pe_bRadiosity 1`).
+
+## 2026-09-25 — Harness: live code swaps only at a safe point
+
+- **Incident:** a live `modswap.py stock` (stock bytes over all 12 mod blocks) hung the Xbox. EIP stayed at kernel 0x800151EF with a fixed ESP, and the frame no longer changed.
+- **Cause:** the guest had been stopped at an arbitrary point, here inside the P6b cave's draw call. When that call returned, it ran into the restored stock ColourFilter bytes. The earlier Grove St swaps were lucky.
+- **Rule:** write patch bytes only with the main thread stopped at the PostFX Render entry **0x24C537**. It runs once per frame after all 3D pipes, and no patched function is on the stack there. Now in `work/session_tools/safepoint.py` (`write_safely`), used by `modswap.py` and `dualpass.py`. Earlier one-block tools (p3live, p4live, grass…) wrote at arbitrary stops too. They worked because their code is rarely on the stack; prefer `write_safely` for any new live poke.
+
+## 2026-09-25 — Showcase grids (for posting)
+
+- Paired captures with the user's framing on both consoles: weather 0, clock frozen, Xbox heat haze 0. The Xbox "original" column is taken live: `modswap.py stock` restores all 12 blocks, the radiosity flag 0 and pe 16, and applies brightness 256 through SetBrightness, giving the stock ramp exponent 0.85. The mod is swapped back afterwards, and every swap is done at the safe point.
+- Scenes: Grove St 12:00 / 19:00 / 00:00, and Glen Park 09:38 (palm canopies zoomed).
+- Output: `captures/showcase/_tweet_grove_{1200,1900,0000,all}.png`, `_tweet_glen_palms.png` (`work/session_tools/tweetgrid.py`).
