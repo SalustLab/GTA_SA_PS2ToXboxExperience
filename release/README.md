@@ -1,4 +1,4 @@
-# GTA San Andreas (Xbox) — PS2 Atmosphere v1.0
+# GTA San Andreas (Xbox) — PS2 Atmosphere v1.1
 
 A patch for the original-Xbox *GTA: San Andreas* that brings back the look of the PS2 version. The Xbox advantages stay: DXT textures, longer draw distance, 480p and the Xbox car shader.
 
@@ -11,53 +11,52 @@ What changes:
 - PS2 alpha test on foliage, so palms, trees and power lines look full and continuous.
 - A neutral display gamma at the default brightness.
 
-Only the game's code (`default.xbe`) and five lines of `stream.ini` change. No game files are included.
+**One file changes: `default.xbe`.** Everything else, `stream.ini` included, stays as it is. No game files are included.
 
 ## Requirements
 
-- Your own copy of **GTA San Andreas, USA, Rev 1**. The script checks `default.xbe` against SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5` and refuses anything else (other regions, Rev 0, or an already-modded file).
+- Your own copy of **GTA San Andreas, USA, Rev 1**. The original `default.xbe` has SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5`. Other regions, Rev 0 or an already-modded file won't patch.
 - A softmodded or modchipped Xbox, or the [xemu](https://xemu.app) emulator. The patched XBE is no longer retail-signed, so an unmodified console won't run it.
-- [xdelta3](https://github.com/jmacd/xdelta-gpl/releases), or any xdelta GUI.
-- For the automatic install: Python 3.
 
-## Install (automatic)
+## Install with any xdelta GUI (easiest)
 
-1. Put `xdelta3.exe` in this folder, or pass its path with `--xdelta`.
-2. Run the script on **either** of these:
-   - A game folder, for example one copied from the Xbox hard drive over FTP. It must contain `default.xbe` and `stream.ini`. The originals are kept as `default.xbe.bak` and `stream.ini.bak`.
+1. Open your xdelta patcher (Delta Patcher, xdelta UI, or any other).
+2. **Original file:** the game's `default.xbe`.
+3. **Patch file:** `default.xbe.xdelta`.
+4. Apply, then replace the game's `default.xbe` with the patched one. Keep the original somewhere safe.
 
-     ```
-     py apply_patch.py "D:\Games\GTA San Andreas"
-     ```
+Done. The patched file has SHA1 `84E14EEF41E0E83D7191A66973C99959815D7553`.
 
-   - An Xbox image (`.iso` / `.xiso`), for example the one you load in xemu. It is patched in place after a full copy is saved as `<name>.iso.bak`, so you need as much free disk space as the image takes.
+If your game is a folder (for example on the Xbox hard drive), copy `default.xbe` to your PC, patch it, and copy it back. If it's an ISO, use the script below, or extract the ISO to a folder first.
 
-     ```
-     py apply_patch.py "D:\xemu\GTA San Andreas (PS2 Atmosphere).iso"
-     ```
+Command line equivalent:
 
-The script checks both files before it writes anything, and checks the result after patching. An existing `.bak` is never overwritten. Running it again on a patched copy only reports `already patched`.
+```
+xdelta3 -d -s default.xbe default.xbe.xdelta default_patched.xbe
+```
 
-## Install (manual)
+## Install with the script (folders and ISO images)
 
-1. Apply `default.xbe.xdelta` to your original `default.xbe` with xdelta3 or an xdelta GUI:
+Needs Python 3 and [`xdelta3.exe`](https://github.com/jmacd/xdelta-gpl/releases) in this folder (or pass `--xdelta <path>`).
 
-   ```
-   xdelta3 -d -s default.xbe default.xbe.xdelta default_patched.xbe
-   ```
+```
+py apply_patch.py "D:\Games\GTA San Andreas"
+py apply_patch.py "D:\xemu\GTA San Andreas.iso"
+```
 
-   Then replace `default.xbe` with `default_patched.xbe`. The result must have SHA1 `2D1829B5647F05930290D6E56425A4B656B8937B`.
-2. Edit `stream.ini` in the game folder so that it contains these lines (separate each key from its value with tabs or spaces):
+- **A folder:** `default.xbe` is patched and the original is kept as `default.xbe.bak`.
+- **An `.iso` / `.xiso`:** a full copy is saved as `<name>.iso.bak` first, so you need as much free space as the image takes. Then `default.xbe` is patched inside the image.
 
-   ```
-   pe_bRadiosity	1
-   pe_leftx	8
-   pe_topy	8
-   pe_rightx	8
-   pe_bottomy	8
-   ```
+The script checks the file before it writes anything and checks the result afterwards. An existing `.bak` is never overwritten. Running it again only reports `already patched`.
 
-   `pe_bRadiosity 1` turns the glow on. The four `pe_*` values (stock: `16`) set the blur strength.
+## Coming from v1.0
+
+Patch the **original** `default.xbe` again: restore it from `default.xbe.bak`, or from your original image. The `stream.ini` lines that v1.0 added can stay; they do no harm.
+
+## Options
+
+- **Turn the radiosity glow off:** add the line `pe_bRadiosity 0` to `stream.ini`.
+- The blur is fixed at the PS2 value. The `pe_*` lines in `stream.ini` are ignored.
 
 ## Recommended setting
 
@@ -65,7 +64,7 @@ Keep **Brightness** at its default. Saves store their own brightness, so reset i
 
 ## Uninstall
 
-Delete the patched files and rename the `.bak` files back: `default.xbe.bak` → `default.xbe`, `stream.ini.bak` → `stream.ini`, or `<name>.iso.bak` → `<name>.iso`.
+Put the original `default.xbe` back: rename `default.xbe.bak` → `default.xbe`, or `<name>.iso.bak` → `<name>.iso`.
 
 ## Credits
 

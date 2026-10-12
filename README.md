@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/SalustLab/GTA_SA_PS2ToXboxExperience/releases/latest"><img src="https://img.shields.io/badge/download-v1.0-FFC440?style=for-the-badge&logo=github&logoColor=black&labelColor=1a1a1a" alt="Download v1.0"></a>
+  <a href="https://github.com/SalustLab/GTA_SA_PS2ToXboxExperience/releases/latest"><img src="https://img.shields.io/badge/download-v1.1-FFC440?style=for-the-badge&logo=github&logoColor=black&labelColor=1a1a1a" alt="Download v1.1"></a>
   <img src="https://img.shields.io/badge/platform-original%20Xbox-107C10?style=for-the-badge&logo=xbox&logoColor=white&labelColor=1a1a1a" alt="Platform: original Xbox">
   <img src="https://img.shields.io/badge/game-GTA%20SA%20%C2%B7%20USA%20Rev%201-F28C28?style=for-the-badge&labelColor=1a1a1a" alt="Game: GTA San Andreas USA Rev 1">
   <br>
@@ -99,20 +99,24 @@ Each loop below flips between the original Xbox and the patched game on the exac
 
 ## Install
 
-You need **your own** copy of GTA San Andreas, **USA, Rev 1**. The installer checks `default.xbe` against SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5` and won't touch anything else.
+You need **your own** copy of GTA San Andreas, **USA, Rev 1** (`default.xbe` SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5`). The whole mod is one file: only `default.xbe` changes, and `stream.ini` and everything else stay untouched.
 
-1. Grab **`SA-PS2Atmosphere-v1.0.zip`** from [Releases](https://github.com/SalustLab/GTA_SA_PS2ToXboxExperience/releases/latest) and unzip it.
-2. Get [xdelta3](https://github.com/jmacd/xdelta-gpl/releases) and drop `xdelta3.exe` into that folder.
-3. Point the installer at your game: either a folder (`default.xbe` + `stream.ini`, for example copied off the Xbox over FTP) or an `.iso` / `.xiso`, for example the one you load in xemu.
+**With any xdelta GUI (easiest):**
 
-   ```
-   py apply_patch.py "D:\Games\GTA San Andreas"
-   py apply_patch.py "D:\xemu\GTA San Andreas.iso"
-   ```
+1. Grab **`SA-PS2Atmosphere-v1.1.zip`** from [Releases](https://github.com/SalustLab/GTA_SA_PS2ToXboxExperience/releases/latest) and unzip it.
+2. Open your xdelta patcher (Delta Patcher, xdelta UI, any of them). Pick the game's `default.xbe` as the original and `default.xbe.xdelta` as the patch.
+3. Apply, and put the patched `default.xbe` back in the game folder. Keep the original somewhere safe.
 
-Before it writes a single byte, the installer checks both files and saves the originals as `.bak` (a full copy for an ISO). After patching, it verifies the result. Running it twice just says `already patched`.
+**With the script (it also patches ISO images in place):** drop [`xdelta3.exe`](https://github.com/jmacd/xdelta-gpl/releases) next to `apply_patch.py` and point the script at your game folder or `.iso` / `.xiso`:
 
-No Python? Apply `default.xbe.xdelta` with any xdelta GUI and edit five lines of `stream.ini` in Notepad. The step-by-step is in [`release/README.md`](release/README.md).
+```
+py apply_patch.py "D:\Games\GTA San Andreas"
+py apply_patch.py "D:\xemu\GTA San Andreas.iso"
+```
+
+Before it writes a single byte, the script checks `default.xbe` and keeps the original as `.bak` (a full copy for an ISO). Afterwards it verifies the result.
+
+Coming from v1.0? Patch the original `default.xbe` again. The `stream.ini` lines that v1.0 added can stay. Full guide: [`release/README.md`](release/README.md).
 
 > [!TIP]
 > Keep **Brightness** at its default. Saves remember their own brightness, so hit *restore defaults* in the Display menu once. The neutral gamma is calibrated for that setting.
@@ -123,7 +127,7 @@ No Python? Apply `default.xbe.xdelta` with any xdelta GUI and edit five lines of
 |---|---|
 | GTA San Andreas, USA, Rev 1 | Supported (the only accepted input) |
 | [xemu](https://xemu.app) | Tested: boots, loads saves, all patches live |
-| Real Xbox, Cerbios + XBMC4Gamers (game folder on the HDD) | Tested: boots, first mission played |
+| Real Xbox, Cerbios + XBMC4Gamers (game folder on the HDD) | Tested with v1.0: boots, first mission played |
 | Other softmodded / modchipped Xbox | Expected to work: the patched XBE loses its retail signature, which modded consoles don't check |
 | Other regions (PAL, NTSC-J), Rev 0 | Not supported: different binaries; the installer refuses them |
 | Stock, unmodded console | Not supported: won't boot an unsigned XBE |
@@ -153,8 +157,7 @@ flowchart LR
 | **P4** | PS2 building lighting on the building pipes only: baked light ×0.91 (the night set a further ×0.80), ambient ×1.8 | Fitted to paired PS2/Xbox captures, day and night |
 | **P5** | Default brightness becomes an identity gamma ramp, as on the PS2 | Noon frame colour error vs PS2: ΔE 5.7 → 1.0 |
 | **P6b** | Foliage drawn with PS2 alpha-test semantics (a dual pass) | Only alpha-tested textures change (1.7–3.9 % of pixels); opaque geometry is identical |
-
-Plus five `stream.ini` values: the blur offsets go from `16` to `8`, and radiosity is switched on.
+| **P7** | Makes the PS2 `stream.ini` settings (blur offsets 8, radiosity on) the built-in defaults, so the stock `stream.ini` needs no edit. `pe_bRadiosity 0` still turns the glow off | Boots with the untouched `stream.ini`. The installer's ISO is byte-identical to the one played in xemu |
 
 The full research is public in this repo: [`docs/PLAN.md`](docs/PLAN.md) has the plan, hypotheses and roadmap, and [`docs/findings.md`](docs/findings.md) is the dated lab log of every address, experiment and verdict.
 
@@ -182,19 +185,19 @@ No game data lives in this repo. Patch JSONs guard the original bytes with a SHA
 
 ```sh
 py patches/p2_filterblur.py          # each generator assembles its patch (keystone) and writes the JSON
-py tools/xbe_patch.py work/xbox/default.xbe dist/default_p2p3p4p5p6b.xbe \
+py tools/xbe_patch.py work/xbox/default.xbe dist/default_v1.1.xbe \
    patches/p2_filterblur.json patches/p3_radiosity.json patches/p4_building_ambient.json \
-   patches/p5_display_gamma.json patches/p6b_dualpass.json
+   patches/p5_display_gamma.json patches/p6b_dualpass.json patches/p7_ini_defaults.json
 ```
 
-`xbe_patch.py` refuses a wrong input hash, targets in BSS, overlapping patches, any mismatch in the original bytes, and patches whose `requires` are missing (P6b needs P2). Every script has a self-check: `py <script> --selftest`.
+`xbe_patch.py` refuses a wrong input hash, targets in BSS, overlapping patches, any mismatch in the original bytes, and patches whose `requires` are missing (P6b needs P2; P7 needs P2 and P3). Every script has a self-check: `py <script> --selftest`.
 
 ### Building the release
 
 ```sh
-xdelta3 -e -9 -S none -A=default.xbe//default.xbe/ -f -s work/xbox/default.xbe dist/default_p2p3p4p5p6b.xbe dist/SA-PS2Atmosphere/default.xbe.xdelta
+xdelta3 -e -9 -S none -A=default.xbe//default.xbe/ -f -s work/xbox/default.xbe dist/default_v1.1.xbe dist/SA-PS2Atmosphere/default.xbe.xdelta
 cp release/README.md release/apply_patch.py xdvdfs_extract.py dist/SA-PS2Atmosphere/
-py -m zipfile -c dist/SA-PS2Atmosphere-v1.0.zip dist/SA-PS2Atmosphere
+py -m zipfile -c dist/SA-PS2Atmosphere-v1.1.zip dist/SA-PS2Atmosphere
 ```
 
 ### Tools

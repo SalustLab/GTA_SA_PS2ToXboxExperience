@@ -847,3 +847,27 @@ Symbols come from the Cxbx-Reloaded symbol cache (`E:\Emuladores\Cxbx-Reloaded\S
 - **Setup:** the user's original Xbox with the Cerbios BIOS and the XBMC4Gamers dashboard. The game was copied to the HDD as an extracted folder, `work/hdd/GTA San Andreas/`, made with `xdvdfs_extract.py` from the patched ISO (now `work/xbox/gtasa_v1.0.xiso.xiso`). 368 files; `diff -rq` against the original extracted Rev 1 folder differs only in `default.xbe` (2d1829b5…) and `stream.ini` (dda7e888…).
 - **Result (user report) [C]:** boots from XBMC4Gamers, and the first mission was played with no problems. The user's TV photo at Grove St shows the PS2-style orange sunset filter with the HUD intact. So the unsigned patched XBE runs under Cerbios.
 - **CCI route, dropped:** Repackinator 2.0.4 (`F:\Tools\Repackinator`) built `.cci` (2.76 GB, no split) + Cerbios attacher `default.xbe` (title ID 0x545400A3, same as the game) + `default.tbn`. The CCI was checked by extracting it again: the patched files were inside. The user preferred the plain folder and the CCI set was deleted, without being tested on the console.
+
+## 2026-10-12 — P7: PS2 stream.ini settings as XBE defaults (v1.1, one-file xdelta)
+
+- **Why:** the user wants the xdelta to be plug and play in any GUI. v1.0 also needed five `stream.ini` lines, so the mod has to live in `default.xbe` alone.
+- **RE [C]:** the stream.ini key handlers live in the parser at 0x157EFD:
+  - `pe_leftx` 0x15805D, `pe_rightx` 0x15807E, `pe_topy` 0x15809C and `pe_bottomy` 0x1580BA each do `push edi; call atoi; mov [0x3CE808/0C/10/14], eax`. These are the only writers, and the stock .data values are already 8 ×4.
+  - `pe_bRadiosity` 0x1580D8 does `atoi; test; setne al; mov [0x5F4B1C], al`. That BSS byte has exactly two references: this writer and the reader `cmp byte [0x5F4B1C], 0; je 0x24CD85` at 0x24CD43, which skips the radiosity call at 0x24CD7D.
+- **P7 as built:** `patches/p7_ini_defaults.py` → `.json` (selftest OK), with 6 edits:
+  - the four pe stores → NOP ×5;
+  - 0x1580E1 `95` → `94` (`sete`);
+  - 0x24CD4A `74` → `75` (`jne`).
+
+  The byte now means "radiosity off". With no line or with `pe_bRadiosity 1` (the v1.0 ini) radiosity is on, and `pe_bRadiosity 0` turns it off. `requires` P2 + P3. P2 + P3 + P4 + P5 + P6b + P7 → `dist/default_v1.1.xbe` sha1 **84e14eef…**. The diff against v1.0 is exactly the 22 bytes above.
+- **Boot test:** `work/xbox/_p7test.xiso` = `gtasa_stock.xiso` with only the v1.1 XBE written (stock `stream.ini`, sha1 67732726…).
+  - The user loaded it in xemu (a session the user started, without the GDB stub) and played in Grove St at 06:00. The warm filter and blur are present (`captures/release_v05/p7_grove.png`).
+  - Boot with the untouched ini [C]. pe 8 and radiosity on are [S], from the visual only: that instance had no GDB to read 0x3CE808 / 0x5F4B1C.
+- **Harness incident:** the xemu install is shared with the BFBB DELUXE project. `xemu.toml`'s `dvd_path` was switched to the BFBB disc while this test ran, so one GDB attach landed on BFBB, and a software breakpoint at 0x158063 was planted into the wrong game. Rules from now on:
+  - never edit `xemu.toml` for tests; launch with `-dvd_path <iso> -s`;
+  - check that no other xemu is running;
+  - verify the expected code bytes in RAM before any `Z0`.
+- **Release v1.1 [C]:** `dist/SA-PS2Atmosphere-v1.1.zip` (xdelta 1475 B, `-S none`, app header `default.xbe`). `apply_patch.py` now patches only `default.xbe` and refuses the v1.0 XBE with a hint. From the unzipped package:
+  - `xdelta3 -d` on the original `default.xbe` (what every GUI runs) → 84e14eef…;
+  - folder mode: XBE patched, `stream.ini` untouched (67732726…), `.bak` = stock; a re-run prints `already patched`; the v1.0 XBE is refused (exit 1, nothing written);
+  - image mode on a fresh `gtasa_stock.xiso` copy: `.bak` == stock, and the patched image is **byte-identical to `_p7test.xiso`**, the ISO played in xemu.

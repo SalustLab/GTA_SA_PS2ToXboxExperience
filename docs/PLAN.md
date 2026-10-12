@@ -2,6 +2,8 @@
 
 Legend: **[C]** Confirmed (read from bytes/source), **[S]** Strongly inferred, **[H]** Hypothesis requiring testing.
 
+> **Status 2026-10-12 (v1.1):** P7 bakes the PS2 `stream.ini` settings into the XBE, so the whole mod is `default.xbe` (`dist/SA-PS2Atmosphere-v1.1.zip`, one xdelta that works in any GUI). Boot-tested in xemu with the stock `stream.ini`. The installer's ISO output is byte-identical to that test ISO.
+>
 > **Status 2026-10-12 (Phase 7):** **release v1.0** (the v0.5 build) built and tested: `dist/SA-PS2Atmosphere-v1.0.zip` (xdelta + `apply_patch.py` + README). The test ISO is `work/xbox/gtasa_v05_release.xiso`, which replaces the lost `gtasa_p2p3p4p5p6b.xiso` (same XBE and ini SHA1s). User sign-off ✅ (2026-10-12, Grove St in game). **Phase 7 closed**; real hardware ✅ 2026-10-12 (Cerbios + XBMC4Gamers, game folder on the HDD; findings "Real hardware").
 >
 > **Earlier status 2026-09-25 (Phase 6):** Phases 0–6 are done. **v0.5 candidate = `gtasa_p2p3p4p5p6b.xiso`** (v0.4 + P6b building-pipe dual pass, PS2 alpha-test semantics; boot-tested and signed off). Phase 6 also closed display filters (no patch), grass (P6c rejected by the user) and heat haze (present; the gap was a harness artefact). Next: Phase 7 (distribution).
@@ -181,6 +183,7 @@ Key Xbox anchors [C]:
 - Current PostFX floats `0x6C88B8–D4`; timecyc limit `0x6C88DC`.
 - Lighting mult `0x24C6B6–0x24C75F`.
 - stream.ini parser `0x157EFD`; timecyc loader `0x156F55`.
+- **P7 — ini defaults. BUILT (2026-10-12):** `patches/p7_ini_defaults.py`. The pe handlers' stores at 0x158063/84/A2/C0 → NOP (the .data pe defaults are already 8); `pe_bRadiosity` handler `setne` → `sete` (0x1580E1) and the only reader, the guard at 0x24CD4A, `je` → `jne`. So the byte 0x5F4B1C now means "radiosity off": on with no line or with `1`, off with `0`. The stock `stream.ini` gives the PS2 settings, so the release is `default.xbe` only (v1.1, sha1 84e14eef…). `requires` P2 + P3.
 - `RwRenderStateSet` = `[0x75DE80]`; `Im2DRenderIndexedPrimitive` = `[0x75DE94]`; index buffer `0x3CE82C`.
 - RW state ids: 1 raster, 6 ztest, 8 zwrite, 9 filter, 10 src, 11 dst, 12 vtxalpha, 14 fog.
 
@@ -255,11 +258,12 @@ SA-PS2Atmosphere/
 - Toggles stay data-driven through the existing ini keys: `pe_bRadiosity` and `pe_*` offsets for blur.
 - Radiosity passes and intensity keep their exe defaults. A new ini key is only worth adding if it's cheap in the parser cave.
 - XBE signature: retail signing cannot be preserved; the target is softmodded/modchipped consoles and xemu, neither of which checks it [S].
+- **v1.1 (2026-10-12):** P7 makes `stream.ini` edits unnecessary, so `apply_patch.py` patches only `default.xbe` and refuses a v1.0 XBE with a "restore the original" hint. The build below uses `dist/default_v1.1.xbe` (P2 + P3 + P4 + P5 + P6b + P7) and `SA-PS2Atmosphere-v1.1.zip`.
 - **As built (release v1.0 = the v0.5 build, 2026-10-12):** sources in `release/` (`README.md`, `apply_patch.py`). `stream.ini.patch.txt` was folded into the README, and there is no `.bat`, because the manual route (xdelta GUI + Notepad) covers users without Python. `apply_patch.py` takes a game folder or an image (patched in place via `xdvdfs_extract.image_files`). Either way it first saves the original as `*.bak`, the image as a full copy; the copy goes through `.bak.part` so an interrupted copy never counts as a backup, and an existing `.bak` is never replaced. It verifies the stock SHA1 of both files before any write and the v0.5 SHA1 after, and makes the ini edits as same-length swaps (`devkit_memory\t38000` → `pe_bRadiosity\t\t\t\t\t1`, `16` → `\t8`). The xdelta has no secondary compression (older decoders lack lzma) and its app header names `default.xbe`. Build:
   ```
-  xdelta3 -e -9 -S none -A=default.xbe//default.xbe/ -f -s work/xbox/default.xbe dist/default_p2p3p4p5p6b.xbe dist/SA-PS2Atmosphere/default.xbe.xdelta
+  xdelta3 -e -9 -S none -A=default.xbe//default.xbe/ -f -s work/xbox/default.xbe dist/default_v1.1.xbe dist/SA-PS2Atmosphere/default.xbe.xdelta
   cp release/README.md release/apply_patch.py xdvdfs_extract.py dist/SA-PS2Atmosphere/
-  py -m zipfile -c dist/SA-PS2Atmosphere-v1.0.zip dist/SA-PS2Atmosphere
+  py -m zipfile -c dist/SA-PS2Atmosphere-v1.1.zip dist/SA-PS2Atmosphere
   ```
 
 ## 16. Testing / validation procedure (the feedback loop)
