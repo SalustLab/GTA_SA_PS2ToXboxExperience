@@ -123,8 +123,8 @@ No Python? Apply `default.xbe.xdelta` with any xdelta GUI and edit five lines of
 |---|---|
 | GTA San Andreas, USA, Rev 1 | Supported (the only accepted input) |
 | [xemu](https://xemu.app) | Tested: boots, loads saves, all patches live |
-| Softmodded / modchipped Xbox | Expected to work: the patched XBE loses its retail signature, which these consoles don't check |
-| Real hardware | Not tested yet. Reports are very welcome. |
+| Real Xbox, Cerbios + XBMC4Gamers (game folder on the HDD) | Tested: boots, first mission played |
+| Other softmodded / modchipped Xbox | Expected to work: the patched XBE loses its retail signature, which modded consoles don't check |
 | Other regions (PAL, NTSC-J), Rev 0 | Not supported: different binaries; the installer refuses them |
 | Stock, unmodded console | Not supported: won't boot an unsigned XBE |
 
@@ -157,7 +157,7 @@ The full research is public in this repo: [`docs/PLAN.md`](docs/PLAN.md) has the
 
 - **Night streets** come out a touch brighter than on the PS2. I traced most of it to the Xbox asphalt texture itself, which is about 6 % brighter than the PS2's. That's game data, not code, and this project keeps the Xbox textures, so I left it alone.
 - **Grass**: I built a PS2-accurate grass tweak, put it side by side with the stock grass, and liked the Xbox grass better. The mechanism is documented in the lab log, but it isn't shipped.
-- **Real hardware**: everything was tested in xemu. A run on a softmodded console is next on my list.
+- **Real hardware**: tested on one console so far (Cerbios + XBMC4Gamers). Reports from other setups (softmods, other BIOSes, dashboards) are very welcome.
 - **Other versions**: only USA Rev 1 for now. Another region would need its own address map.
 
 ## For tinkerers
