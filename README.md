@@ -21,17 +21,17 @@
 </p>
 
 <p align="center">
-  <a href="#-see-it">See it</a> ·
-  <a href="#-install">Install</a> ·
-  <a href="#-compatibility">Compatibility</a> ·
-  <a href="#-how-it-works">How it works</a> ·
-  <a href="#-for-tinkerers">For tinkerers</a> ·
-  <a href="#-credits">Credits</a>
+  <a href="#see-it">See it</a> ·
+  <a href="#install">Install</a> ·
+  <a href="#compatibility">Compatibility</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#for-tinkerers">For tinkerers</a> ·
+  <a href="#credits">Credits</a>
 </p>
 
 ---
 
-## 🌆 Why this exists
+## Why this exists
 
 If you played San Andreas on a PS2, you remember the air. The orange haze over Los Santos at sunset, the soft glow on every bright wall, that slightly dreamy blur over everything.
 
@@ -49,7 +49,7 @@ The first surprise: `timecyc.dat`, the file that holds the colours for every hou
 
 **PS2 Atmosphere** is a set of small, surgical x86 patches to `default.xbe` that put the PS2 behaviour back. Each one was checked against PS2 captures of the same frozen scene.
 
-## 📸 See it
+## See it
 
 <p align="center">
   <img src="docs/media/compare_grove.jpg" alt="Grove Street at 12:00, 19:00 and 00:00: PS2, original Xbox, Xbox with the patch" width="100%">
@@ -69,35 +69,35 @@ Each loop below flips between the original Xbox and the patched game on the exac
   <br><sub>Glen Park. The Xbox cuts palm fronds into hard, broken shapes; the PS2 alpha test keeps them full and soft. The patch draws them the PS2 way.</sub>
 </p>
 
-## ✨ What changes, what stays
+## What changes, what stays
 
 <table>
 <tr>
 <td width="50%" valign="top">
 
 **What you get from the PS2**
-- 🟠 The colour filter: the warm orange (or green, or grey) grade from `timecyc.dat`, at full strength
-- 🌫️ The soft blur on that filter
-- ☀️ The radiosity glow on bright surfaces
-- 🏠 PS2 building lighting: stronger ambient light, softer baked light
-- 🌴 Full, continuous foliage, palm fronds and power lines
-- 🎚️ A neutral display gamma at the default brightness
+- The colour filter: the warm orange (or green, or grey) grade from `timecyc.dat`, at full strength
+- The soft blur on that filter
+- The radiosity glow on bright surfaces
+- PS2 building lighting: stronger ambient light, softer baked light
+- Full, continuous foliage, palm fronds and power lines
+- A neutral display gamma at the default brightness
 
 </td>
 <td width="50%" valign="top">
 
 **What you keep from the Xbox**
-- 🧱 DXT textures
-- 🔭 Longer draw distance (LODs)
-- 📺 480p output
-- 🚗 The Xbox car reflection shader
-- 💾 Your saves: the patch doesn't touch them
+- DXT textures
+- Longer draw distance (LODs)
+- 480p output
+- The Xbox car reflection shader
+- Your saves: the patch doesn't touch them
 
 </td>
 </tr>
 </table>
 
-## 📦 Install
+## Install
 
 You need **your own** copy of GTA San Andreas, **USA, Rev 1**. The installer checks `default.xbe` against SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5` and won't touch anything else.
 
@@ -117,18 +117,18 @@ No Python? Apply `default.xbe.xdelta` with any xdelta GUI and edit five lines of
 > [!TIP]
 > Keep **Brightness** at its default. Saves remember their own brightness, so hit *restore defaults* in the Display menu once. The neutral gamma is calibrated for that setting.
 
-## 🎮 Compatibility
+## Compatibility
 
 | Setup | Status |
 |---|---|
-| GTA San Andreas, USA, Rev 1 | ✅ Supported (the only accepted input) |
-| [xemu](https://xemu.app) | ✅ Tested: boots, loads saves, all patches live |
-| Softmodded / modchipped Xbox | ✅ Expected to work: the patched XBE loses its retail signature, which these consoles don't check |
-| Real hardware | ⏳ Not tested yet. Reports are very welcome. |
-| Other regions (PAL, NTSC-J), Rev 0 | ❌ Different binaries; the installer refuses them |
-| Stock, unmodded console | ❌ Won't boot an unsigned XBE |
+| GTA San Andreas, USA, Rev 1 | Supported (the only accepted input) |
+| [xemu](https://xemu.app) | Tested: boots, loads saves, all patches live |
+| Softmodded / modchipped Xbox | Expected to work: the patched XBE loses its retail signature, which these consoles don't check |
+| Real hardware | Not tested yet. Reports are very welcome. |
+| Other regions (PAL, NTSC-J), Rev 0 | Not supported: different binaries; the installer refuses them |
+| Stock, unmodded console | Not supported: won't boot an unsigned XBE |
 
-## 🔧 How it works
+## How it works
 
 Everything happens inside one frame of the game's renderer. Each patch replaces Xbox code in place, usually inside the original function's own bytes, so the file size never changes.
 
@@ -153,14 +153,14 @@ Plus five `stream.ini` values: the blur offsets go from `16` to `8`, and radiosi
 
 The full research is public in this repo: [`docs/PLAN.md`](docs/PLAN.md) has the plan, hypotheses and roadmap, and [`docs/findings.md`](docs/findings.md) is the dated lab log of every address, experiment and verdict.
 
-## 🧭 Known limits & what's next
+## Known limits & what's next
 
 - **Night streets** come out a touch brighter than on the PS2. I traced most of it to the Xbox asphalt texture itself, which is about 6 % brighter than the PS2's. That's game data, not code, and this project keeps the Xbox textures, so I left it alone.
 - **Grass**: I built a PS2-accurate grass tweak, put it side by side with the stock grass, and liked the Xbox grass better. The mechanism is documented in the lab log, but it isn't shipped.
 - **Real hardware**: everything was tested in xemu. A run on a softmodded console is next on my list.
 - **Other versions**: only USA Rev 1 for now. Another region would need its own address map.
 
-## 🛠 For tinkerers
+## For tinkerers
 
 <details>
 <summary><b>Build it yourself, poke at it, break it</b></summary>
@@ -214,14 +214,14 @@ py -m zipfile -c dist/SA-PS2Atmosphere-v1.0.zip dist/SA-PS2Atmosphere
 
 </details>
 
-## 🙏 Credits
+## Credits
 
 - **aap**, for [SkyGfx](https://github.com/aap/skygfx): that research into how the PS2 renders San Andreas is the reference this whole project is measured against.
 - The [gta-reversed](https://github.com/gta-reversed/gta-reversed) project, for mapping the engine.
 - [xemu](https://xemu.app) and [PCSX2](https://pcsx2.net), the two emulators every test in this project ran on.
 - [xdelta](https://github.com/jmacd/xdelta), for the patch format.
 
-## ⚖️ Legal
+## Legal
 
 This is a fan project. It is not affiliated with or endorsed by Rockstar Games or Take-Two Interactive. *Grand Theft Auto* and *San Andreas* are their trademarks.
 
