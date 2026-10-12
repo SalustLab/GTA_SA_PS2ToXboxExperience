@@ -258,10 +258,14 @@ SA-PS2Atmosphere/
 - Toggles stay data-driven through the existing ini keys: `pe_bRadiosity` and `pe_*` offsets for blur.
 - Radiosity passes and intensity keep their exe defaults. A new ini key is only worth adding if it's cheap in the parser cave.
 - XBE signature: retail signing cannot be preserved; the target is softmodded/modchipped consoles and xemu, neither of which checks it [S].
+- **ISO patches (v1.1, 2026-10-12):** `tools/iso_xdelta.py` writes `xiso.xdelta` (game partition, 7,419,363,328 B) and `redump-iso.xdelta` (Redump, 7,825,162,240 B), about 29 KB each. Every 8 MiB window is a same-offset COPY plus ADDs of the changed bytes, with an adler32 per window. The Redump video-partition windows are unchecksummed: we don't have those bytes, and the copy reproduces them. A wrong image fails with "checksum mismatch".
 - **v1.1 (2026-10-12):** P7 makes `stream.ini` edits unnecessary, so `apply_patch.py` patches only `default.xbe` and refuses a v1.0 XBE with a "restore the original" hint. The build below uses `dist/default_v1.1.xbe` (P2 + P3 + P4 + P5 + P6b + P7) and `SA-PS2Atmosphere-v1.1.zip`.
 - **As built (release v1.0 = the v0.5 build, 2026-10-12):** sources in `release/` (`README.md`, `apply_patch.py`). `stream.ini.patch.txt` was folded into the README, and there is no `.bat`, because the manual route (xdelta GUI + Notepad) covers users without Python. `apply_patch.py` takes a game folder or an image (patched in place via `xdvdfs_extract.image_files`). Either way it first saves the original as `*.bak`, the image as a full copy; the copy goes through `.bak.part` so an interrupted copy never counts as a backup, and an existing `.bak` is never replaced. It verifies the stock SHA1 of both files before any write and the v0.5 SHA1 after, and makes the ini edits as same-length swaps (`devkit_memory\t38000` → `pe_bRadiosity\t\t\t\t\t1`, `16` → `\t8`). The xdelta has no secondary compression (older decoders lack lzma) and its app header names `default.xbe`. Build:
   ```
   xdelta3 -e -9 -S none -A=default.xbe//default.xbe/ -f -s work/xbox/default.xbe dist/default_v1.1.xbe dist/SA-PS2Atmosphere/default.xbe.xdelta
+  N="Grand Theft Auto - San Andreas (USA) (En,Es) (Rev 1) (PS2 Atmosphere v1.1)"
+  py tools/iso_xdelta.py work/xbox/gtasa_stock.xiso work/xbox/gtasa_v1.1.xiso dist/SA-PS2Atmosphere/xiso.xdelta --name "$N.xiso"
+  py tools/iso_xdelta.py work/xbox/gtasa_stock.xiso work/xbox/gtasa_v1.1.xiso dist/SA-PS2Atmosphere/redump-iso.xdelta --redump --name "$N.iso"
   cp release/README.md release/apply_patch.py xdvdfs_extract.py dist/SA-PS2Atmosphere/
   py -m zipfile -c dist/SA-PS2Atmosphere-v1.1.zip dist/SA-PS2Atmosphere
   ```

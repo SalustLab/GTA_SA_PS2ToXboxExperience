@@ -876,3 +876,12 @@ Symbols come from the Cxbx-Reloaded symbol cache (`E:\Emuladores\Cxbx-Reloaded\S
 
 - **Result (user report) [C]:** the v1.1 `default.xbe` (sha1 84e14eef…, P2–P7) runs on the user's original Xbox with Cerbios + XBMC4Gamers. P7's parser and guard edits behave on hardware as in xemu.
 - The local `work/hdd/GTA San Andreas/` is still the v1.0 folder (XBE 2d1829b5…, ini dda7e888…). The console copy was patched separately.
+
+## 2026-10-12 — Whole-ISO xdelta patches (XISO + Redump)
+
+- **Why:** the user wants ISO patches, as is usual for xdelta releases. An ISO xdelta only applies to the exact image it was made for, and image layouts differ by tool. Found on this box: a 3.06 GB rebuilt xiso with `default.xbe` at sector 265, sha1 1ceae5be… (not Rev 1, probably Rev 0; not supported). The user chose two targets: the Redump image and our game-partition XISO.
+- **Tool:** `tools/iso_xdelta.py` (selftest decodes with the real xdelta3 and rejects a wrong source). It diffs stock vs v1.1 XISO into 51 runs, all inside `default.xbe`, and writes 8 MiB VCDIFF windows. Each window is a same-offset COPY (code table 19, mode 0) plus ADD (1) of the changed bytes, with `VCD_ADLER32`, laid out as xdelta3 writes it (checked on its own output). With `--redump` everything shifts by 0x18300000. The video-partition windows get no checksum: the Redump ISO isn't on this box, and a same-offset copy reproduces whatever is there.
+- **Validation [C]** (xdelta3 3.1.0):
+  - `xiso.xdelta` (28,595 B) on `gtasa_stock.xiso` gives a byte-identical `gtasa_v1.1.xiso`. On that rebuilt image it fails with "target window checksum mismatch", exit 1.
+  - `redump-iso.xdelta` (29,818 B) on a synthetic Redump (random 0x18300000-byte video partition + `gtasa_stock.xiso`, 7,825,162,240 B): the video partition is untouched and the game partition equals `gtasa_v1.1.xiso`. Synthetic files deleted.
+  - Not tested: a real Redump Rev 1 dump (none on this box).

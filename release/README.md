@@ -20,14 +20,23 @@ What changes:
 
 ## Install with any xdelta GUI (easiest)
 
+Pick the patch that matches the file you have:
+
+| Your file | Patch |
+|---|---|
+| `default.xbe` from a game folder (for example on the Xbox hard drive) | `default.xbe.xdelta` |
+| Redump ISO, `Grand Theft Auto - San Andreas (USA) (En,Es) (Rev 1).iso`, 7,825,162,240 bytes | `redump-iso.xdelta` |
+| XISO of the game partition (the Redump ISO minus its video partition), 7,419,363,328 bytes | `xiso.xdelta` |
+
 1. Open your xdelta patcher (Delta Patcher, xdelta UI, or any other).
-2. **Original file:** the game's `default.xbe`.
-3. **Patch file:** `default.xbe.xdelta`.
-4. Apply, then replace the game's `default.xbe` with the patched one. Keep the original somewhere safe.
+2. **Original file:** your file. **Patch file:** the matching `.xdelta`.
+3. Apply. Keep the original somewhere safe.
 
-Done. The patched file has SHA1 `84E14EEF41E0E83D7191A66973C99959815D7553`.
+If you patched `default.xbe`, put the patched file back in the game folder. The patched XBE has SHA1 `84E14EEF41E0E83D7191A66973C99959815D7553`.
 
-If your game is a folder (for example on the Xbox hard drive), copy `default.xbe` to your PC, patch it, and copy it back. If it's an ISO, use the script below, or extract the ISO to a folder first.
+A patched Redump ISO stays in Redump format. Convert it the way you usually do (Repackinator, extract-xiso, ...); xemu doesn't boot the Redump format directly, but it boots the patched XISO as is.
+
+The wrong file is rejected with *"checksum mismatch"*. An ISO that was rebuilt or trimmed (for example by extract-xiso or Repackinator) has a different layout, so the ISO patches won't fit it. For those, use the script below, or extract the ISO and patch `default.xbe`.
 
 Command line equivalent:
 

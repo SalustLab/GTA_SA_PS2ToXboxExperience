@@ -104,8 +104,15 @@ You need **your own** copy of GTA San Andreas, **USA, Rev 1** (`default.xbe` SHA
 **With any xdelta GUI (easiest):**
 
 1. Grab **`SA-PS2Atmosphere-v1.1.zip`** from [Releases](https://github.com/SalustLab/GTA_SA_PS2ToXboxExperience/releases/latest) and unzip it.
-2. Open your xdelta patcher (Delta Patcher, xdelta UI, any of them). Pick the game's `default.xbe` as the original and `default.xbe.xdelta` as the patch.
-3. Apply, and put the patched `default.xbe` back in the game folder. Keep the original somewhere safe.
+2. Open your xdelta patcher (Delta Patcher, xdelta UI, any of them) and pick the patch that matches your file:
+
+   | Your file | Patch |
+   |---|---|
+   | `default.xbe` from a game folder | `default.xbe.xdelta` |
+   | Redump ISO (7,825,162,240 bytes) | `redump-iso.xdelta` |
+   | XISO of the game partition (7,419,363,328 bytes, boots in xemu) | `xiso.xdelta` |
+
+3. Apply. Keep the original somewhere safe. The wrong file is rejected with *"checksum mismatch"*.
 
 **With the script (it also patches ISO images in place):** drop [`xdelta3.exe`](https://github.com/jmacd/xdelta-gpl/releases) next to `apply_patch.py` and point the script at your game folder or `.iso` / `.xiso`:
 
@@ -196,6 +203,9 @@ py tools/xbe_patch.py work/xbox/default.xbe dist/default_v1.1.xbe \
 
 ```sh
 xdelta3 -e -9 -S none -A=default.xbe//default.xbe/ -f -s work/xbox/default.xbe dist/default_v1.1.xbe dist/SA-PS2Atmosphere/default.xbe.xdelta
+N="Grand Theft Auto - San Andreas (USA) (En,Es) (Rev 1) (PS2 Atmosphere v1.1)"
+py tools/iso_xdelta.py work/xbox/gtasa_stock.xiso work/xbox/gtasa_v1.1.xiso dist/SA-PS2Atmosphere/xiso.xdelta --name "$N.xiso"
+py tools/iso_xdelta.py work/xbox/gtasa_stock.xiso work/xbox/gtasa_v1.1.xiso dist/SA-PS2Atmosphere/redump-iso.xdelta --redump --name "$N.iso"
 cp release/README.md release/apply_patch.py xdvdfs_extract.py dist/SA-PS2Atmosphere/
 py -m zipfile -c dist/SA-PS2Atmosphere-v1.1.zip dist/SA-PS2Atmosphere
 ```
@@ -211,6 +221,7 @@ py -m zipfile -c dist/SA-PS2Atmosphere-v1.1.zip dist/SA-PS2Atmosphere
 | `tools/predict_filter.py` | Expected PS2 / Xbox colour-filter output for a frame |
 | `tools/ps2_cheats.pnach` | Alternative PS2 clock and weather freeze |
 | `xdvdfs_extract.py` | Extracts or lists an Xbox XDVDFS image (7-Zip misreads the format) |
+| `tools/iso_xdelta.py` | Builds the whole-ISO xdelta patches (XISO and Redump) for an in-place mod |
 | `release/apply_patch.py` | The player-facing installer |
 
 ### Layout
