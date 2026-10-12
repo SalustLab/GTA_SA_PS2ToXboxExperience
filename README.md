@@ -1,6 +1,6 @@
 # GTA SA Xbox — PS2 Atmosphere
 
-A binary patch for the original-Xbox *GTA: San Andreas* (USA, Rev 1). It brings back the PS2 look: the orange colour filter, the soft blur and the radiosity glow. Building lighting is in progress. It keeps what the Xbox version does better: DXT textures, longer LOD distances, 480p and the Xbox car shader.
+A binary patch for the original-Xbox *GTA: San Andreas* (USA, Rev 1). It brings back the PS2 look: the orange colour filter, the soft blur and the radiosity glow. It keeps what the Xbox version does better: DXT textures, longer LOD distances, 480p and the Xbox car shader.
 
 `timecyc.dat` and the game assets are identical on both consoles. The difference lives in engine code, so every change is an in-place x86 or fixed-function D3D patch to `default.xbe`, plus a few `stream.ini` lines.
 
