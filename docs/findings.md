@@ -871,3 +871,8 @@ Symbols come from the Cxbx-Reloaded symbol cache (`E:\Emuladores\Cxbx-Reloaded\S
   - `xdelta3 -d` on the original `default.xbe` (what every GUI runs) → 84e14eef…;
   - folder mode: XBE patched, `stream.ini` untouched (67732726…), `.bak` = stock; a re-run prints `already patched`; the v1.0 XBE is refused (exit 1, nothing written);
   - image mode on a fresh `gtasa_stock.xiso` copy: `.bak` == stock, and the patched image is **byte-identical to `_p7test.xiso`**, the ISO played in xemu.
+
+## 2026-10-12 — Real hardware: v1.1
+
+- **Result (user report) [C]:** the v1.1 `default.xbe` (sha1 84e14eef…, P2–P7) runs on the user's original Xbox with Cerbios + XBMC4Gamers. P7's parser and guard edits behave on hardware as in xemu.
+- The local `work/hdd/GTA San Andreas/` is still the v1.0 folder (XBE 2d1829b5…, ini dda7e888…). The console copy was patched separately.

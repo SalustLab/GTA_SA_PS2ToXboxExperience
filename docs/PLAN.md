@@ -2,7 +2,7 @@
 
 Legend: **[C]** Confirmed (read from bytes/source), **[S]** Strongly inferred, **[H]** Hypothesis requiring testing.
 
-> **Status 2026-10-12 (v1.1):** P7 bakes the PS2 `stream.ini` settings into the XBE, so the whole mod is `default.xbe` (`dist/SA-PS2Atmosphere-v1.1.zip`, one xdelta that works in any GUI). Boot-tested in xemu with the stock `stream.ini`. The installer's ISO output is byte-identical to that test ISO.
+> **Status 2026-10-12 (v1.1):** P7 bakes the PS2 `stream.ini` settings into the XBE, so the whole mod is `default.xbe` (`dist/SA-PS2Atmosphere-v1.1.zip`, one xdelta that works in any GUI). Boot-tested in xemu with the stock `stream.ini`. The installer's ISO output is byte-identical to that test ISO. Real hardware ✅ (user, Cerbios + XBMC4Gamers).
 >
 > **Status 2026-10-12 (Phase 7):** **release v1.0** (the v0.5 build) built and tested: `dist/SA-PS2Atmosphere-v1.0.zip` (xdelta + `apply_patch.py` + README). The test ISO is `work/xbox/gtasa_v05_release.xiso`, which replaces the lost `gtasa_p2p3p4p5p6b.xiso` (same XBE and ini SHA1s). User sign-off ✅ (2026-10-12, Grove St in game). **Phase 7 closed**; real hardware ✅ 2026-10-12 (Cerbios + XBMC4Gamers, game folder on the HDD; findings "Real hardware").
 >

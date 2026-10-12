@@ -127,7 +127,7 @@ Coming from v1.0? Patch the original `default.xbe` again. The `stream.ini` lines
 |---|---|
 | GTA San Andreas, USA, Rev 1 | Supported (the only accepted input) |
 | [xemu](https://xemu.app) | Tested: boots, loads saves, all patches live |
-| Real Xbox, Cerbios + XBMC4Gamers (game folder on the HDD) | Tested with v1.0: boots, first mission played |
+| Real Xbox, Cerbios + XBMC4Gamers (game folder on the HDD) | Tested with v1.0 and v1.1: boots and plays |
 | Other softmodded / modchipped Xbox | Expected to work: the patched XBE loses its retail signature, which modded consoles don't check |
 | Other regions (PAL, NTSC-J), Rev 0 | Not supported: different binaries; the installer refuses them |
 | Stock, unmodded console | Not supported: won't boot an unsigned XBE |
