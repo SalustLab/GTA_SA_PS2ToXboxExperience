@@ -823,3 +823,21 @@ Symbols come from the Cxbx-Reloaded symbol cache (`E:\Emuladores\Cxbx-Reloaded\S
 - Paired captures with the user's framing on both consoles: weather 0, clock frozen, Xbox heat haze 0. The Xbox "original" column is taken live: `modswap.py stock` restores all 12 blocks, the radiosity flag 0 and pe 16, and applies brightness 256 through SetBrightness, giving the stock ramp exponent 0.85. The mod is swapped back afterwards, and every swap is done at the safe point.
 - Scenes: Grove St 12:00 / 19:00 / 00:00, and Glen Park 09:38 (palm canopies zoomed).
 - Output: `captures/showcase/_tweet_grove_{1200,1900,0000,all}.png`, `_tweet_glen_palms.png` (`work/session_tools/tweetgrid.py`).
+
+## 2026-10-12 — Phase 7: release package v0.5 (xdelta + installer), clean tests
+
+- **Lost ISOs (noted 2026-10-12):** `work/xbox/` held only `gtasa_stock.xiso`. Both the v0.4 and v0.5 ISOs were gone, deleted after 2026-09-25 with no log entry. `dist/default_p2p3p4p5p6b.xbe` (sha1 2d1829b5…) and `work/xbox/stream_pe8_rad.ini` (sha1 dda7e888…) were intact, so the release is built from them.
+- **Package:** `dist/SA-PS2Atmosphere-v0.5.zip` holds `README.md`, `apply_patch.py`, `xdvdfs_extract.py` and `default.xbe.xdelta` (1439 B). The xdelta3 3.1.0 encode uses `-9 -S none -A=default.xbe//default.xbe/`. The first encode had lzma secondary compression, which older decoders lack, and named the internal file `default_p2p3p4p5p6b.xbe` in its app header; both were removed. Round-trip decode → sha1 2d1829b5… [C].
+- **Installer [C]** (run from the unzipped package, `py -B`):
+  - Folder (copies of the extracted Rev 1 `default.xbe` + `stream.ini`): patched to 2d1829b5… / dda7e888…, with `.bak` files equal to stock. A re-run prints `already patched` for both files. Without xdelta3 it exits with the help message.
+  - Wrong input (1 byte flipped in `default.xbe`): refused, exit 1. `stream.ini` is untouched and no `.bak` is written, because both files are checked before any write.
+  - Image: `work/xbox/gtasa_v05_release.xiso` is a copy of `gtasa_stock.xiso`. Files are located through `xdvdfs_extract.image_files` (default.xbe sector 348678, stream.ini sector 1998977) and patched in place. Full compare against stock: 2436 bytes differ, **0 outside the two files**, and the embedded sha1s are 2d1829b5… / dda7e888…. A re-run prints `already patched`.
+- **Boot (xemu, `dvd_path` → `gtasa_v05_release.xiso`) [C]:** `modswap.py state` polled every 15 s shows **12/12 mod blocks** from the first poll. The radiosity flag `0x5F4B1C` goes 0 → **1 at ~135 s**, when the game reads `stream.ini`. pe reads 8 ×4 throughout, but the stock XBE's .data default is already 8 (only the ini's `16` changes it), so pe = 8 is consistent, not proof [S]. In game at CJ's house, 06:00: HUD intact. `captures/release_v05/boot.png`.
+- Not done: real hardware (none available here); a GUI xdelta decoder (Delta Patcher / xdelta UI) on the `.xdelta`.
+- **Visual sign-off (user, 2026-10-12) ✅** on `gtasa_v05_release.xiso`, in game at Grove St: "all is fine". **Phase 7 closed.**
+
+## 2026-10-12 — Release renamed v1.0; installer backs up images too
+
+- The user named this release **v1.0**. It is the v0.5 build with the same XBE and ini SHA1s. The package is now `dist/SA-PS2Atmosphere-v1.0.zip`, and the v0.5 zip was deleted.
+- `apply_patch.py` now saves `<image>.bak` (a full copy) before patching an image in place, as folder mode already did for its files (user request). The copy goes through `.bak.part` and is renamed when complete, so an interrupted copy is never taken for a backup on the next run; an existing `.bak` is never replaced. The backup happens only after both files pass the SHA1 checks and the xdelta decode, and never on an already-patched image. Selftest covers it.
+- **Retest from the unzipped v1.0 [C]:** folder mode unchanged (2d1829b5… / dda7e888…, `.bak` = stock). Image: a fresh `gtasa_stock.xiso` copy → `.bak` byte-identical to stock (`cmp`), patched image 2436 bytes differ and 0 outside the two files, and a re-run prints `already patched` without a second copy. Test images deleted afterwards.

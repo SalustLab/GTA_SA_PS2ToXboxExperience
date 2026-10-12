@@ -86,6 +86,15 @@ def walk_files(f, base, sector, size, prefix="", visited=None):
             yield path, start, fsize
 
 
+def image_files(f):
+    """Return (partition base, [(path, start_sector, size)]) for an open image."""
+    f.seek(0, 2)
+    base = find_partition_base(f, f.tell())
+    f.seek(base + RESERVED_SECTORS * SECTOR + len(SIG))
+    root_sector, root_size = struct.unpack("<II", f.read(8))
+    return base, list(walk_files(f, base, root_sector, root_size))
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
     if len(sys.argv) < 2:
@@ -96,16 +105,8 @@ def main():
                   os.path.splitext(iso)[0])
 
     with open(iso, "rb") as f:
-        f.seek(0, 2)
-        size = f.tell()
-        base = find_partition_base(f, size)
-        sig_off = base + RESERVED_SECTORS * SECTOR
-        f.seek(sig_off + len(SIG))
-        root_sector, root_size = struct.unpack("<II", f.read(8))
+        base, files = image_files(f)
         print(f"partition base: {base} (sector {base // SECTOR})")
-        print(f"root: sector {root_sector}, {root_size} bytes")
-
-        files = list(walk_files(f, base, root_sector, root_size))
         total = sum(s for _, _, s in files)
         print(f"{len(files)} files, {total} bytes")
 

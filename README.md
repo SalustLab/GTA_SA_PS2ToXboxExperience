@@ -12,7 +12,10 @@ A binary patch for the original-Xbox *GTA: San Andreas* (USA, Rev 1). It brings 
 | P5 | Neutral display gamma at brightness 256 | done |
 | P2 | PS2 colour-filter blur (pass 2 sampled with LINEAR at +pe/16 texels); supersedes P1 | done (v0.2) |
 | P3 | PS2 radiosity (SkyGfx fixed-function path, intensity /255) | done (v0.3) |
-| P4 | PS2 building lighting: ambient ~2× relative to prelight, prelight scaled down | in progress; ambient ×2 alone overshoots, 2-parameter version next |
+| P4 | PS2 building lighting: ambient ~2× relative to prelight, prelight scaled down | done (v0.4) |
+| P6b | PS2 alpha-test semantics on the building pipe (foliage dual pass) | done (v0.5) |
+
+**Release v1.0** (the v0.5 build): players install from `dist/SA-PS2Atmosphere-v1.0.zip` (xdelta + `apply_patch.py`; sources and the player README are in [`release/`](release/), and the build steps are in PLAN §15).
 
 The plan and roadmap are in [`docs/PLAN.md`](docs/PLAN.md). The dated lab log (RE results, addresses, experiment verdicts) is in [`docs/findings.md`](docs/findings.md).
 
@@ -42,7 +45,7 @@ pe_bottomy	8
 pe_bRadiosity	1
 ```
 
-Apply P2 + P3 + P5 (v0.3); P4 is not ready. P2 already contains P1, and `xbe_patch.py` refuses P1 + P2. Each script has a self-check: `py <script> --selftest`.
+v0.5 = P2 + P3 + P4 + P5 + P6b. P2 already contains P1, and `xbe_patch.py` refuses P1 + P2. Each script has a self-check: `py <script> --selftest`.
 
 ## Layout
 
