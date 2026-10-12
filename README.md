@@ -128,6 +128,11 @@ No Python? Apply `default.xbe.xdelta` with any xdelta GUI and edit five lines of
 | Other regions (PAL, NTSC-J), Rev 0 | Not supported: different binaries; the installer refuses them |
 | Stock, unmodded console | Not supported: won't boot an unsigned XBE |
 
+<p align="center">
+  <img src="docs/media/real_hardware.jpg" alt="PS2 Atmosphere v1.0 running on a real original Xbox: Grove Street under an orange evening sky on the TV, the console below" width="420">
+  <br><sub>v1.0 on real hardware: an original Xbox with Cerbios + XBMC4Gamers, Grove Street in the evening.</sub>
+</p>
+
 ## How it works
 
 Everything happens inside one frame of the game's renderer. Each patch replaces Xbox code in place, usually inside the original function's own bytes, so the file size never changes.
