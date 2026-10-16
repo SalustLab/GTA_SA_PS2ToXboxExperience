@@ -1,6 +1,6 @@
 # GTA San Andreas (Xbox) — PS2 Atmosphere v1.2
 
-New in v1.2: support for USA **Rev 0** (the first release). The patch itself is unchanged from v1.1; Rev 1 users who already have v1.1 don't need to do anything.
+New in v1.2: support for USA **Rev 0** (the original release). The patch itself is unchanged from v1.1; Rev 1 users who already have v1.1 don't need to do anything.
 
 A patch for the original-Xbox *GTA: San Andreas* that brings back the look of the PS2 version. The Xbox advantages stay: DXT textures, longer draw distance, 480p and the Xbox car shader.
 
@@ -18,8 +18,8 @@ What changes:
 ## Requirements
 
 - Your own copy of **GTA San Andreas, USA**, either revision:
-  - **Rev 1**: the original `default.xbe` has SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5`.
-  - **Rev 0** (the first release): SHA1 `1CEAE5BE753B3675CE8C5C79D7F496DFC0AD597D`.
+  - **Rev 1** (the Platinum Hits / *The Trilogy* release, title ID `545400A3`): the original `default.xbe` has SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5`.
+  - **Rev 0** (the original release, title ID `54540082`): SHA1 `1CEAE5BE753B3675CE8C5C79D7F496DFC0AD597D`.
 
   Other regions or an already-modded file won't patch.
 - A softmodded or modchipped Xbox, or the [xemu](https://xemu.app) emulator. The patched XBE is no longer retail-signed, so an unmodified console won't run it.

@@ -99,7 +99,7 @@ Each loop below flips between the original Xbox and the patched game on the exac
 
 ## Install
 
-You need **your own** copy of GTA San Andreas, **USA, Rev 1** (`default.xbe` SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5`) or **USA, Rev 0** (the original release, SHA1 `1CEAE5BE753B3675CE8C5C79D7F496DFC0AD597D`). The whole mod is one file: only `default.xbe` changes, and `stream.ini` and everything else stay untouched.
+You need **your own** copy of GTA San Andreas, **USA, Rev 1** (Platinum Hits / *The Trilogy*; `default.xbe` SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5`) or **USA, Rev 0** (the original release; SHA1 `1CEAE5BE753B3675CE8C5C79D7F496DFC0AD597D`). The whole mod is one file: only `default.xbe` changes, and `stream.ini` and everything else stay untouched.
 
 **With any xdelta GUI (easiest):**
 
@@ -112,7 +112,7 @@ You need **your own** copy of GTA San Andreas, **USA, Rev 1** (`default.xbe` SHA
    | Full game ISO (7,825,162,240 bytes) | `iso.xdelta` |
    | XISO of the game partition (7,419,363,328 bytes, boots in xemu) | `xiso.xdelta` |
 
-   The ISO patches are made for the Redump dumps (Rev 0 tested on its Redump image). Not sure which revision you have? Rev 1 is `Grand Theft Auto - San Andreas (USA) (En,Es) (Rev 1)`, Rev 0 is `Grand Theft Auto - San Andreas (USA) (En,Es)`. Or use the script below, which picks the right patch by itself.
+   The ISO patches are made for the Redump dumps (Rev 0 tested on its Redump image). Not sure which revision you have? Rev 1 (Platinum Hits / The Trilogy) is `Grand Theft Auto - San Andreas (USA) (En,Es) (Rev 1)`, Rev 0 is `Grand Theft Auto - San Andreas (USA) (En,Es)`. Or use the script below, which picks the right patch by itself.
 
 3. Apply. Keep the original somewhere safe. The wrong file is rejected with *"checksum mismatch"*.
 
@@ -125,7 +125,7 @@ py apply_patch.py "D:\xemu\GTA San Andreas.iso"
 
 Before it writes a single byte, the script checks `default.xbe` and keeps the original as `.bak` (a full copy for an ISO). Afterwards it verifies the result.
 
-Already on v1.1 (Rev 1)? Nothing to do: v1.2 only adds Rev 0. Already on v1.1 (Rev 1)? Nothing to do: v1.2 only adds Rev 0. Coming from v1.0? Patch the original `default.xbe` again. The `stream.ini` lines that v1.0 added can stay. Full guide: [`release/README.md`](release/README.md).
+Already on v1.1 (Rev 1)? Nothing to do: v1.2 only adds Rev 0. Coming from v1.0? Patch the original `default.xbe` again. The `stream.ini` lines that v1.0 added can stay. Full guide: [`release/README.md`](release/README.md).
 
 > [!TIP]
 > Keep **Brightness** at its default. Saves remember their own brightness, so hit *restore defaults* in the Display menu once. The neutral gamma is calibrated for that setting.
@@ -134,8 +134,8 @@ Already on v1.1 (Rev 1)? Nothing to do: v1.2 only adds Rev 0. Already on v1.1 (R
 
 | Setup | Status |
 |---|---|
-| GTA San Andreas, USA, Rev 1 | Supported |
-| GTA San Andreas, USA, Rev 0 (original release) | Supported since 2026-10-16: same patches, ported address by address; tested in xemu and on real hardware |
+| GTA San Andreas, USA, Rev 1 (Platinum Hits / The Trilogy, title ID 545400A3) | Supported |
+| GTA San Andreas, USA, Rev 0 (original release, title ID 54540082) | Supported since 2026-10-16: same patches, ported address by address; tested in xemu and on real hardware |
 | [xemu](https://xemu.app) | Tested: boots, loads saves, all patches live |
 | Real Xbox, Cerbios + XBMC4Gamers (game folder on the HDD) | Tested with v1.0, v1.1 and v1.2 (Rev 1 and Rev 0): boots and plays |
 | Other softmodded / modchipped Xbox | Expected to work: the patched XBE loses its retail signature, which modded consoles don't check |

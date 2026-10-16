@@ -923,3 +923,4 @@ Symbols come from the Cxbx-Reloaded symbol cache (`E:\Emuladores\Cxbx-Reloaded\S
   - every packaged xdelta decodes with xdelta3 3.1.0: XBE patches → 84e14eef… / 6883102c…; XISO patches → byte-identical modded XISOs;
   - `GTA SA (USA) Rev 0/iso.xdelta` on the real Rev 0 Redump ISO changes exactly 2434 bytes, and the embedded XBE is 6883102c…;
   - the packaged `apply_patch.py` patches a Rev 0 and a Rev 1 folder correctly.
+- **Editions [C] (2026-10-16):** per xemu-project/xdb `titles/TT/130/info.json`, title ID 54540082 = USA Original (our Rev 0) and 545400A3 = USA Platinum Hits / *The Trilogy* (our Rev 1). Both IDs match the XBE certificates read earlier. The docs keep the Rev 0 / Rev 1 names and add the editions.

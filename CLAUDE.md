@@ -14,7 +14,7 @@ Core finding: `timecyc.dat` and all assets are identical between the PS2 and Xbo
 
 - **Never modify the originals.** Both ISOs and the extracted folders are read-only: `Microsoft - Xbox/…(Rev 1)/`, the Rev 0 Redump ISO `Microsoft - Xbox/Grand Theft Auto - San Andreas (USA) (En,Es).iso`, and `Sony - PlayStation 2/…(v3.00) (Rev 1)/`. Work only on copies under `work/`.
 - The originals, `work/`, `captures/` and `dist/*.xbe` are gitignored (copyrighted and huge). Never commit Rockstar bytes. Committed patch JSONs guard original bytes with `orig_sha1` instead of `orig` for this reason. A distributed mod ships only an xdelta/BPS diff plus the ini lines to change (PLAN §15).
-- The supported targets are `default.xbe` USA Rev 1, SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5`, and USA Rev 0, SHA1 `1CEAE5BE753B3675CE8C5C79D7F496DFC0AD597D`. Tools must verify the hash and refuse any other input.
+- The supported targets are `default.xbe` USA Rev 1, SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5`, and USA Rev 0, SHA1 `1CEAE5BE753B3675CE8C5C79D7F496DFC0AD597D`. Per xemu-project/xdb, Rev 1 (title ID 545400A3) is the Platinum Hits / The Trilogy disc and Rev 0 (54540082) the original release. Tools must verify the hash and refuse any other input.
 - Rev 1 is the reference: every address in the docs and generators is a Rev 1 VA. Rev 0 builds come from the same generators with `--rev0` (output `patches/pN_*.rev0.json`, with `xbe_sha1`), which map each address through `tools/rev0_map.py`. Never hand-write a Rev 0 address; add it to a generator via `A()` so it gets proven. Proven pairs are cached in `patches/rev0_map.json` (delete it to re-prove).
 - Label claims with the evidence legend from PLAN.md:
   - **[C]** confirmed from bytes or source;

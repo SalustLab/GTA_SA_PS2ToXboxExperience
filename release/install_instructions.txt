@@ -2,9 +2,11 @@ PS2 Atmosphere v1.2 for GTA San Andreas (Xbox, USA) - quick install
 =====================================================================
 
 1. Find your version
-   Rev 1: default.xbe SHA1 10EFB868F13D6944AA6684A52CAC5156393F14C5
+   Rev 1 (Platinum Hits / The Trilogy, title ID 545400A3):
+          default.xbe SHA1 10EFB868F13D6944AA6684A52CAC5156393F14C5
           ISO name: Grand Theft Auto - San Andreas (USA) (En,Es) (Rev 1).iso
-   Rev 0: default.xbe SHA1 1CEAE5BE753B3675CE8C5C79D7F496DFC0AD597D
+   Rev 0 (original release, title ID 54540082):
+          default.xbe SHA1 1CEAE5BE753B3675CE8C5C79D7F496DFC0AD597D
           ISO name: Grand Theft Auto - San Andreas (USA) (En,Es).iso
    Not sure? Try one folder's patch: the wrong one stops with
    "checksum mismatch" and changes nothing.
