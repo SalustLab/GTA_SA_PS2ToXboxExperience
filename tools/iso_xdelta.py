@@ -112,7 +112,7 @@ def selftest():
     mod = bytearray(game)
     for off in (0, 999, 1000, 2500, 4995):                                       # cut edges + file ends
         mod[off:off + 5] = b"PATCH"[:len(mod[off:off + 5])]
-    exe = shutil.which("xdelta3") or next(iter(__import__("glob").glob("F:/Tools/xdelta/xdelta3*.exe")), None)
+    exe = os.environ.get("XDELTA3") or shutil.which("xdelta3")
     with tempfile.TemporaryDirectory() as t:
         p = lambda n: os.path.join(t, n)
         open(p("s"), "wb").write(game); open(p("m"), "wb").write(mod)

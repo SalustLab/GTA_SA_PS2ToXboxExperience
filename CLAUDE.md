@@ -66,8 +66,9 @@ There is no build system, linter or test suite. Each script has an assert-based 
 ## Environment
 
 This is a local RE workstation. There is no database, web app or deploy target.
-- PCSX2: `E:\Emuladores\PCSX2`, with PINE enabled.
-- xemu 0.8.136: `E:\Emuladores\xemu`. Launch it with `xemu-gdb.bat` for the GDB stub. QEMU halts the guest while GDB is attached; `xemu_gdb.py` detaches after every command, which resumes it.
-- Cxbx-Reloaded: `E:\Emuladores\Cxbx-Reloaded`.
-- Ghidra 12.1.4: `F:\Tools\ghidra`.
-- xdelta: `F:\Tools\xdelta`.
+- PCSX2, with PINE enabled.
+- xemu 0.8.136. Launch it with `xemu-gdb.bat` for the GDB stub. QEMU halts the guest while GDB is attached; `xemu_gdb.py` detaches after every command, which resumes it.
+- Cxbx-Reloaded.
+- Ghidra 12.1.4.
+- xdelta3 3.1.0. `tools/iso_xdelta.py --selftest` finds it through `XDELTA3` or PATH.
+- Local install paths: `CLAUDE.local.md` (not committed).
