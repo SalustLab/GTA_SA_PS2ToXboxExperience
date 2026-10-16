@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/SalustLab/GTA_SA_PS2ToXboxExperience/releases/latest"><img src="https://img.shields.io/badge/download-v1.1-FFC440?style=for-the-badge&logo=github&logoColor=black&labelColor=1a1a1a" alt="Download v1.1"></a>
+  <a href="https://github.com/SalustLab/GTA_SA_PS2ToXboxExperience/releases/latest"><img src="https://img.shields.io/badge/download-v1.2-FFC440?style=for-the-badge&logo=github&logoColor=black&labelColor=1a1a1a" alt="Download v1.2"></a>
   <img src="https://img.shields.io/badge/platform-original%20Xbox-107C10?style=for-the-badge&logo=xbox&logoColor=white&labelColor=1a1a1a" alt="Platform: original Xbox">
-  <img src="https://img.shields.io/badge/game-GTA%20SA%20%C2%B7%20USA%20Rev%201-F28C28?style=for-the-badge&labelColor=1a1a1a" alt="Game: GTA San Andreas USA Rev 1">
+  <img src="https://img.shields.io/badge/game-GTA%20SA%20%C2%B7%20USA%20Rev%200%20%2F%20Rev%201-F28C28?style=for-the-badge&labelColor=1a1a1a" alt="Game: GTA San Andreas USA Rev 0 / Rev 1">
   <br>
   <img src="https://img.shields.io/badge/runs%20on-xemu%20%7C%20softmod-4c8dff?style=for-the-badge&labelColor=1a1a1a" alt="Runs on xemu or a softmodded console">
   <img src="https://img.shields.io/badge/patch-1.4%20KB%20xdelta-9b59b6?style=for-the-badge&labelColor=1a1a1a" alt="Patch: 1.4 KB xdelta">
@@ -99,18 +99,20 @@ Each loop below flips between the original Xbox and the patched game on the exac
 
 ## Install
 
-You need **your own** copy of GTA San Andreas, **USA, Rev 1** (`default.xbe` SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5`). The whole mod is one file: only `default.xbe` changes, and `stream.ini` and everything else stay untouched.
+You need **your own** copy of GTA San Andreas, **USA, Rev 1** (`default.xbe` SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5`) or **USA, Rev 0** (the original release, SHA1 `1CEAE5BE753B3675CE8C5C79D7F496DFC0AD597D`). The whole mod is one file: only `default.xbe` changes, and `stream.ini` and everything else stay untouched.
 
 **With any xdelta GUI (easiest):**
 
-1. Grab **`SA-PS2Atmosphere-v1.1.zip`** from [Releases](https://github.com/SalustLab/GTA_SA_PS2ToXboxExperience/releases/latest) and unzip it.
+1. Grab **`SA-PS2Atmosphere-v1.2.zip`** from [Releases](https://github.com/SalustLab/GTA_SA_PS2ToXboxExperience/releases/latest) and unzip it.
 2. Open your xdelta patcher (Delta Patcher, xdelta UI, any of them) and pick the patch that matches your file:
 
-   | Your file | Patch |
+   | Your file | Patch (in the `Rev 1` or `Rev 0` folder) |
    |---|---|
    | `default.xbe` from a game folder | `default.xbe.xdelta` |
-   | Redump ISO (7,825,162,240 bytes) | `redump-iso.xdelta` |
+   | Full game ISO (7,825,162,240 bytes) | `iso.xdelta` |
    | XISO of the game partition (7,419,363,328 bytes, boots in xemu) | `xiso.xdelta` |
+
+   The ISO patches are made for the Redump dumps (Rev 0 tested on its Redump image). Not sure which revision you have? Rev 1 is `Grand Theft Auto - San Andreas (USA) (En,Es) (Rev 1)`, Rev 0 is `Grand Theft Auto - San Andreas (USA) (En,Es)`. Or use the script below, which picks the right patch by itself.
 
 3. Apply. Keep the original somewhere safe. The wrong file is rejected with *"checksum mismatch"*.
 
@@ -123,7 +125,7 @@ py apply_patch.py "D:\xemu\GTA San Andreas.iso"
 
 Before it writes a single byte, the script checks `default.xbe` and keeps the original as `.bak` (a full copy for an ISO). Afterwards it verifies the result.
 
-Coming from v1.0? Patch the original `default.xbe` again. The `stream.ini` lines that v1.0 added can stay. Full guide: [`release/README.md`](release/README.md).
+Already on v1.1 (Rev 1)? Nothing to do: v1.2 only adds Rev 0. Already on v1.1 (Rev 1)? Nothing to do: v1.2 only adds Rev 0. Coming from v1.0? Patch the original `default.xbe` again. The `stream.ini` lines that v1.0 added can stay. Full guide: [`release/README.md`](release/README.md).
 
 > [!TIP]
 > Keep **Brightness** at its default. Saves remember their own brightness, so hit *restore defaults* in the Display menu once. The neutral gamma is calibrated for that setting.
@@ -132,11 +134,12 @@ Coming from v1.0? Patch the original `default.xbe` again. The `stream.ini` lines
 
 | Setup | Status |
 |---|---|
-| GTA San Andreas, USA, Rev 1 | Supported (the only accepted input) |
+| GTA San Andreas, USA, Rev 1 | Supported |
+| GTA San Andreas, USA, Rev 0 (original release) | Supported since 2026-10-16: same patches, ported address by address; tested in xemu and on real hardware |
 | [xemu](https://xemu.app) | Tested: boots, loads saves, all patches live |
-| Real Xbox, Cerbios + XBMC4Gamers (game folder on the HDD) | Tested with v1.0 and v1.1: boots and plays |
+| Real Xbox, Cerbios + XBMC4Gamers (game folder on the HDD) | Tested with v1.0, v1.1 and v1.2 (Rev 1 and Rev 0): boots and plays |
 | Other softmodded / modchipped Xbox | Expected to work: the patched XBE loses its retail signature, which modded consoles don't check |
-| Other regions (PAL, NTSC-J), Rev 0 | Not supported: different binaries; the installer refuses them |
+| Other regions (PAL, NTSC-J) | Not supported: different binaries; the installer refuses them |
 | Stock, unmodded console | Not supported: won't boot an unsigned XBE |
 
 <p align="center">
@@ -173,7 +176,7 @@ The full research is public in this repo: [`docs/PLAN.md`](docs/PLAN.md) has the
 - **Night streets** come out a touch brighter than on the PS2. I traced most of it to the Xbox asphalt texture itself, which is about 6 % brighter than the PS2's. That's game data, not code, and this project keeps the Xbox textures, so I left it alone.
 - **Grass**: I built a PS2-accurate grass tweak, put it side by side with the stock grass, and liked the Xbox grass better. The mechanism is documented in the lab log, but it isn't shipped.
 - **Real hardware**: tested on one console so far (Cerbios + XBMC4Gamers). Reports from other setups (softmods, other BIOSes, dashboards) are very welcome.
-- **Other versions**: only USA Rev 1 for now. Another region would need its own address map.
+- **Other versions**: USA Rev 1 and Rev 0. Another region would need its own address map (`tools/rev0_map.py` shows how Rev 0 was ported).
 
 ## For tinkerers
 
@@ -182,7 +185,7 @@ The full research is public in this repo: [`docs/PLAN.md`](docs/PLAN.md) has the
 
 ### Requirements
 
-- Your own dump of `default.xbe`, USA Rev 1 (SHA1 above). Every tool refuses any other input.
+- Your own dump of `default.xbe`, USA Rev 1 or Rev 0 (SHA1s above). Every tool refuses any other input. Rev 0 goes in `work/xbox_rev0/`, Rev 1 in `work/xbox/`.
 - Python 3.13 with `capstone`, `pefile`, `pillow`, `numpy` and `keystone-engine`.
 - For live testing: xemu with its GDB stub, and PCSX2 with PINE for the PS2 reference.
 
@@ -197,17 +200,26 @@ py tools/xbe_patch.py work/xbox/default.xbe dist/default_v1.1.xbe \
    patches/p5_display_gamma.json patches/p6b_dualpass.json patches/p7_ini_defaults.json
 ```
 
-`xbe_patch.py` refuses a wrong input hash, targets in BSS, overlapping patches, any mismatch in the original bytes, and patches whose `requires` are missing (P6b needs P2; P7 needs P2 and P3). Every script has a self-check: `py <script> --selftest`.
+For Rev 0, run each generator with `--rev0`: it writes `patches/pN_*.rev0.json`, with every Rev 1 address mapped through `tools/rev0_map.py` (proven pairs cached in `patches/rev0_map.json`). Apply those to `work/xbox_rev0/default.xbe` the same way.
+
+`xbe_patch.py` refuses a wrong input hash (a Rev 0 JSON names its input in `xbe_sha1`), targets in BSS, overlapping patches, any mismatch in the original bytes, and patches whose `requires` are missing (P6b needs P2; P7 needs P2 and P3). Every script has a self-check: `py <script> --selftest`.
 
 ### Building the release
 
 ```sh
-xdelta3 -e -9 -S none -A=default.xbe//default.xbe/ -f -s work/xbox/default.xbe dist/default_v1.1.xbe dist/SA-PS2Atmosphere/default.xbe.xdelta
-N="Grand Theft Auto - San Andreas (USA) (En,Es) (Rev 1) (PS2 Atmosphere v1.1)"
-py tools/iso_xdelta.py work/xbox/gtasa_stock.xiso work/xbox/gtasa_v1.1.xiso dist/SA-PS2Atmosphere/xiso.xdelta --name "$N.xiso"
-py tools/iso_xdelta.py work/xbox/gtasa_stock.xiso work/xbox/gtasa_v1.1.xiso dist/SA-PS2Atmosphere/redump-iso.xdelta --redump --name "$N.iso"
-cp release/README.md release/apply_patch.py xdvdfs_extract.py dist/SA-PS2Atmosphere/
-py -m zipfile -c dist/SA-PS2Atmosphere-v1.1.zip dist/SA-PS2Atmosphere
+R=dist/SA-PS2Atmosphere-v1.2; mkdir -p "$R/Rev 1" "$R/Rev 0"
+# Rev 1
+xdelta3 -e -9 -S none -A=default.xbe//default.xbe/ -f -s work/xbox/default.xbe dist/default_v1.1.xbe "$R/Rev 1/default.xbe.xdelta"
+N="Grand Theft Auto - San Andreas (USA) (En,Es) (Rev 1) (PS2 Atmosphere v1.2)"
+py tools/iso_xdelta.py work/xbox/gtasa_stock.xiso work/xbox/gtasa_v1.1.xiso "$R/Rev 1/xiso.xdelta" --name "$N.xiso"
+py tools/iso_xdelta.py work/xbox/gtasa_stock.xiso work/xbox/gtasa_v1.1.xiso "$R/Rev 1/iso.xdelta" --redump --name "$N.iso"
+# Rev 0
+xdelta3 -e -9 -S none -A=default.xbe//default.xbe/ -f -s work/xbox_rev0/default.xbe dist/default_rev0_v1.1.xbe "$R/Rev 0/default.xbe.xdelta"
+N="Grand Theft Auto - San Andreas (USA) (En,Es) (PS2 Atmosphere v1.2)"
+py tools/iso_xdelta.py work/xbox_rev0/gtasa_stock.xiso work/xbox_rev0/gtasa_rev0_v1.1.xiso "$R/Rev 0/xiso.xdelta" --name "$N.xiso"
+py tools/iso_xdelta.py work/xbox_rev0/gtasa_stock.xiso work/xbox_rev0/gtasa_rev0_v1.1.xiso "$R/Rev 0/iso.xdelta" --redump --name "$N.iso"
+cp release/README.md release/install_instructions.txt release/apply_patch.py xdvdfs_extract.py "$R/"
+(cd dist && py -m zipfile -c SA-PS2Atmosphere-v1.2.zip SA-PS2Atmosphere-v1.2)
 ```
 
 ### Tools
@@ -221,7 +233,8 @@ py -m zipfile -c dist/SA-PS2Atmosphere-v1.1.zip dist/SA-PS2Atmosphere
 | `tools/predict_filter.py` | Expected PS2 / Xbox colour-filter output for a frame |
 | `tools/ps2_cheats.pnach` | Alternative PS2 clock and weather freeze |
 | `xdvdfs_extract.py` | Extracts or lists an Xbox XDVDFS image (7-Zip misreads the format) |
-| `tools/iso_xdelta.py` | Builds the whole-ISO xdelta patches (XISO and Redump) for an in-place mod |
+| `tools/iso_xdelta.py` | Builds the whole-ISO xdelta patches (XISO and full ISO) for an in-place mod |
+| `tools/rev0_map.py` | Maps Rev 1 addresses to Rev 0 by aligning the two builds' code; each address is proven by matching code or by references that all agree |
 | `release/apply_patch.py` | The player-facing installer |
 
 ### Layout

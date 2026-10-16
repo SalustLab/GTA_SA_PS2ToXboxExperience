@@ -1,7 +1,8 @@
-"""PS2 Atmosphere installer for GTA San Andreas (Xbox, USA Rev 1).
+"""PS2 Atmosphere installer for GTA San Andreas (Xbox, USA Rev 1 or Rev 0).
 
-Patches default.xbe with default.xbe.xdelta. That is the whole mod: since v1.1 the PS2 stream.ini settings are
-built into default.xbe, so stream.ini stays untouched.
+Patches default.xbe with "Rev 1/default.xbe.xdelta" or "Rev 0/default.xbe.xdelta", picked by its SHA1.
+That is the whole mod: since v1.1 the PS2 stream.ini settings are built into default.xbe, so stream.ini stays
+untouched.
 
 Usage:
     py apply_patch.py <game folder | image.iso>  [--xdelta path\\to\\xdelta3.exe]
@@ -9,7 +10,7 @@ Usage:
 
 A game folder must hold default.xbe; an .iso / .xiso is patched in place.
 Either way the original is kept as *.bak first (an existing .bak is never replaced).
-Any input other than the USA Rev 1 default.xbe is refused and nothing is written.
+Any input other than the USA Rev 1 or Rev 0 default.xbe is refused and nothing is written.
 """
 import glob
 import hashlib
@@ -23,7 +24,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(HERE))  # repo layout: xdvdfs_extract.py sits one level up
 from xdvdfs_extract import SECTOR, image_files  # noqa: E402
 
-XBE = ("10efb868f13d6944aa6684a52cac5156393f14c5", "84e14eef41e0e83d7191a66973c99959815d7553")
+XBE = {  # stock default.xbe SHA1 -> (patched SHA1, xdelta file)
+    "10efb868f13d6944aa6684a52cac5156393f14c5": ("84e14eef41e0e83d7191a66973c99959815d7553", "Rev 1/default.xbe.xdelta"),  # USA Rev 1
+    "1ceae5be753b3675ce8c5c79d7f496dfc0ad597d": ("6883102c897eaa58e8e01fb41a51b9c4b44b481d", "Rev 0/default.xbe.xdelta"),  # USA Rev 0
+}
 OLDER = {"2d1829b5647f05930290d6e56425a4b656b8937b": "PS2 Atmosphere v1.0"}
 
 
@@ -39,12 +43,20 @@ def find_xdelta(arg):
     return exe
 
 
-def xdelta_decode(exe, xbe):
+def pick(have, table=XBE):
+    """((stock, mod), xdelta file) for a stock or already-patched SHA1, else None."""
+    for stock, (mod, patch) in table.items():
+        if have in (stock, mod):
+            return (stock, mod), patch
+    return None
+
+
+def xdelta_decode(exe, xbe, patch):
     with tempfile.TemporaryDirectory() as tmp:
         src, out = os.path.join(tmp, "in.xbe"), os.path.join(tmp, "out.xbe")
         with open(src, "wb") as f:
             f.write(xbe)
-        subprocess.run([exe, "-d", "-f", "-s", src, os.path.join(HERE, "default.xbe.xdelta"), out], check=True)
+        subprocess.run([exe, "-d", "-f", "-s", src, os.path.join(HERE, patch), out], check=True)
         with open(out, "rb") as f:
             return f.read()
 
@@ -66,7 +78,7 @@ def patched(name, data, hashes, fn):
     if have in OLDER:
         raise SystemExit(f"{name} is {OLDER[have]}: put the original back (default.xbe.bak) and run again; nothing written")
     if have != stock:
-        raise SystemExit(f"{name}: SHA1 {have} is not GTA SA USA Rev 1 ({stock}); nothing written")
+        raise SystemExit(f"{name}: SHA1 {have} is not GTA SA USA Rev 1 or Rev 0 ({', '.join(XBE)}); nothing written")
     new = fn(data)
     if sha1(new) != mod or len(new) != len(data):
         raise SystemExit(f"{name}: patch result has SHA1 {sha1(new)}, expected {mod}; nothing written")
@@ -74,11 +86,16 @@ def patched(name, data, hashes, fn):
 
 
 def run(target, exe):
-    name, fn = "default.xbe", lambda d: xdelta_decode(exe, d)
+    name = "default.xbe"
+
+    def patch_xbe(data):
+        hashes, patch = pick(sha1(data)) or (("", ""), None)   # unknown input: patched() refuses it
+        return patched(name, data, hashes, lambda d: xdelta_decode(exe, d, patch))
+
     if os.path.isdir(target):
         path = os.path.join(target, name)
         with open(path, "rb") as f:
-            new = patched(name, f.read(), XBE, fn)
+            new = patch_xbe(f.read())
         if new is not None:
             backup(path)
             with open(path, "wb") as f:
@@ -93,7 +110,7 @@ def run(target, exe):
         off, size = where[name]
         f.seek(off)
         old = f.read(size)
-    new = patched(name, old, XBE, fn)  # same length as old, so it fits in place
+    new = patch_xbe(old)  # same length as old, so it fits in place
     if new is None:
         return
     print(f"backing up {target} -> {target}.bak (needs as much free space as the image)")
@@ -126,6 +143,10 @@ def selftest():
         with open(p + ".bak", "rb") as f:
             assert f.read() == b"stock"                                   # an existing backup is never replaced
         assert os.listdir(tmp) == ["game.iso", "game.iso.bak"]            # no .part left behind
+    assert pick(sha1(b"x"), {sha1(b"x"): ("m", "a.xdelta")}) == ((sha1(b"x"), "m"), "a.xdelta")
+    assert pick("m", {sha1(b"x"): ("m", "a.xdelta")})[1] == "a.xdelta"               # an already-patched file
+    assert pick("zz", {sha1(b"x"): ("m", "a.xdelta")}) is None                       # unknown: patched() refuses
+    assert {pick(s)[1] for s in XBE} == {"Rev 1/default.xbe.xdelta", "Rev 0/default.xbe.xdelta"}
     print("apply_patch selftest OK")
 
 

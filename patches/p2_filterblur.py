@@ -22,9 +22,10 @@ from keystone import KS_ARCH_X86, KS_MODE_32, Ks
 
 sys.path.insert(0, str(Path(__file__).parent))
 from p1_colourfilter import START as FILTER, XBE, build  # noqa: E402
+from rev0_map import REV, A, write_json  # noqa: E402  (p1 put tools/ on sys.path)
 
-CAVE, CAVE_END = 0x24ECAA, 0x24EEA2         # Xbox blur pass, ret at 0x24EEA1
-BLUR_CALL = 0x24CC89                        # call 0x24ECAA, the only reference to the cave [C]
+CAVE, CAVE_END = A(0x24ECAA), A(0x24EEA2)        # Xbox blur pass, ret at 0x24EEA1
+BLUR_CALL = A(0x24CC89)                       # call 0x24ECAA, the only reference to the cave [C]
 
 
 def patches(xbe):
@@ -55,8 +56,8 @@ def selftest():
     got = [int(i.op_str.split("+ ")[1].rstrip("]"), 16) for i in ins if i.mnemonic == "fstp"]
     assert got == want, (got, want)
     offs = [i.op_str for i in ins if i.mnemonic == "fild"]
-    assert offs == [f"dword ptr [{0x3CE808 + 4 * a:#x}]" for a in range(4)], offs
-    p1 = json.loads(Path(__file__).with_name("p1_colourfilter.json").read_text())["patches"][0]["new"]
+    assert offs == [f"dword ptr [{A(0x3CE808) + 4 * a:#x}]" for a in range(4)], offs
+    p1 = json.loads(Path(__file__).with_name("p1_colourfilter.json" if REV == "rev1" else "p1_colourfilter.rev0.json").read_text())["patches"][0]["new"]
     assert build()[0].hex() == p1, "blur=False must keep the v0.1 P1 bytes"
     print("p2_filterblur selftest OK")
 
@@ -67,5 +68,5 @@ if __name__ == "__main__":
         sys.exit()
     entries, body = patches(XBE.read_bytes())
     out = {"name": "P2 ColourFilter PS2 formula + blur (supersedes P1; apply with P5, not with P1)", "patches": entries}
-    Path(__file__).with_suffix(".json").write_text(json.dumps(out, indent=2))
-    print(f"{len(body.rstrip(bytes([0xcc])))} code bytes / {len(body)}; wrote {Path(__file__).with_suffix('.json').name}")
+    path = write_json(__file__, out)
+    print(f"{len(body.rstrip(bytes([0xcc])))} code bytes / {len(body)}; wrote {path.name}")

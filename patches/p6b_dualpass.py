@@ -18,16 +18,20 @@ Usage: py patches/p6b_dualpass.py [--selftest]      -> writes patches/p6b_dualpa
 """
 import struct
 import sys
+from pathlib import Path
+
 from keystone import Ks, KS_ARCH_X86, KS_MODE_32
 
-SITE, DRAW, FLUSH = 0x16AFA3, 0x2A0F00, 0x2A0230
-RS_SET, RS_GET = 0x75DE80, 0x75DE84
-D3D_ATEST, D3D_BLEND = 0x36E378, 0x36E374
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+from rev0_map import SHA1, XBE, A, write_json  # noqa: E402  (--rev0: Rev 1 VAs below are mapped to Rev 0)
+
+SITE, DRAW, FLUSH = A(0x16AFA3), A(0x2A0F00), A(0x2A0230)
+RS_SET, RS_GET = A(0x75DE80), A(0x75DE84)
+D3D_ATEST, D3D_BLEND = A(0x36E378), A(0x36E374)
 ZWRITE, AFUNC, AREF = 8, 29, 30
 LESS, GEQUAL, REF = 2, 7, 128
-CAVE, CAVE_END = 0x24F00C, 0x24F133   # dead stock ColourFilter body: P2 turns 0x24F007 into jmp 0x24ECAA
+CAVE, CAVE_END = A(0x24F00C), A(0x24F133)   # dead stock ColourFilter body: P2 turns 0x24F007 into jmp 0x24ECAA
                                      # (no external jump or pointer into 0x24F00C-0x24F132), so P6b requires P2
-XBE = __import__("pathlib").Path(__file__).resolve().parents[1] / "work" / "xbox" / "default.xbe"
 
 
 def site(cave):
@@ -47,9 +51,9 @@ def asm(cave):
         + get(ZWRITE, 4) + get(AFUNC, 8) + get(AREF, 12)
         + set_(AFUNC, GEQUAL) + set_(AREF, REF) + draw          # pass 1
         + set_(AFUNC, LESS) + set_(ZWRITE, 0) + draw            # pass 2
-        + "push dword ptr [ebp-4]\npush 8\ncall dword ptr [0x75de80]\nadd esp, 8\n"
-        + "push dword ptr [ebp-8]\npush 29\ncall dword ptr [0x75de80]\nadd esp, 8\n"
-        + "push dword ptr [ebp-12]\npush 30\ncall dword ptr [0x75de80]\nadd esp, 8\n"
+        + f"push dword ptr [ebp-4]\npush 8\ncall dword ptr [{RS_SET:#x}]\nadd esp, 8\n"
+        + f"push dword ptr [ebp-8]\npush 29\ncall dword ptr [{RS_SET:#x}]\nadd esp, 8\n"
+        + f"push dword ptr [ebp-12]\npush 30\ncall dword ptr [{RS_SET:#x}]\nadd esp, 8\n"
         + "leave\nret\n"
         + f"single:\njmp {DRAW:#x}\n")
 
@@ -75,15 +79,13 @@ def selftest():
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ["--selftest"]:
+    if "--selftest" in sys.argv:
         selftest()
         sys.exit()
-    import hashlib, json
-    from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+    import hashlib
     import xbe_patch as xp
     xbe = XBE.read_bytes()
-    assert hashlib.sha1(xbe).hexdigest() == xp.REV1_SHA1
+    assert hashlib.sha1(xbe).hexdigest() == SHA1
     secs = xp.sections(xbe)
     stock_site = b"\xE8" + struct.pack("<i", DRAW - (SITE + 5))
     o = xp.va_to_offset(secs, SITE, 5)
@@ -97,5 +99,4 @@ if __name__ == "__main__":
                 "note": "mesh helper 0x16AD9A: call 0x2A0F00 (flush + DrawIndexedVertices) -> call dual-pass cave"},
                {"va": hex(CAVE), "orig_sha1": hashlib.sha1(xbe[oc:oc + len(code)]).hexdigest(), "new": code.hex(),
                 "note": "dual pass: GEQUAL 128 with Z, then LESS 128 without Z write, if alpha test and blend are on"}]}
-    Path(__file__).with_suffix(".json").write_text(json.dumps(out, indent=2))
-    print(f"wrote {Path(__file__).with_suffix('.json').name} ({len(code)} B cave)")
+    print(f"wrote {write_json(__file__, out).name} ({len(code)} B cave)")

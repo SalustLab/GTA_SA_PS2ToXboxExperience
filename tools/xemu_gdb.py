@@ -1,4 +1,4 @@
-"""Poke/read GTA SA (Xbox USA Rev 1) state in xemu through its GDB stub (start xemu with -s, port 1234).
+"""Poke/read GTA SA (Xbox USA Rev 1; add --rev0 for Rev 0) state in xemu through its GDB stub (start xemu with -s, port 1234).
 
 Usage:
   py tools/xemu_gdb.py clock <hour> <minute>        set + freeze the clock
@@ -10,6 +10,7 @@ Usage:
   py tools/xemu_gdb.py idlecam off|on               CIdleCam kick-in time 1e30 / stock 90000 ms (idle pan + HUD hide)
   py tools/xemu_gdb.py capture <out.png>            PrintWindow of the xemu window (works when covered), 2x box-reduced
   py tools/xemu_gdb.py --cxbx <command ...>         same commands on Cxbx-Reloaded via process memory (no filterargs)
+  py tools/xemu_gdb.py --rev0 <command ...>         same commands for the USA Rev 0 default.xbe
   py tools/xemu_gdb.py --selftest
 
 QEMU halts the guest while GDB is attached; every command detaches at the end, which resumes it.
@@ -28,6 +29,17 @@ PLAYERS = 0x6C8F18                     # CWorld::Players[0].m_pPed
 COLOURFILTER_CALL = 0x24CAF5           # call CPostEffects::ColourFilter(c1, c2); args = packed RGBA bytes
 TIME_SCALE = 0x56B9AC                 # CTimer::ms_fTimeScale [S] (savegame field order), freeze tested live
 IDLECAM_KICKIN = 0x6C5270             # gIdleCam 0x6C5248 +0x28: ms without input before the idle cam [C] (Init 0xD271F)
+if "--rev0" in sys.argv:               # USA Rev 0: same build, data at -0x240 (proven by tools/rev0_map.py)
+    sys.argv.remove("--rev0")
+    CLOCK_SECONDS, CLOCK_MINUTES, CLOCK_HOURS = 0x55F19C, 0x55F19E, 0x55F19F
+    MS_PER_GAME_MINUTE = 0x55F1A8
+    WEATHER_FORCED, WEATHER_NEW, WEATHER_OLD = 0x5E60B4, 0x5E60B8, 0x5E60BC
+    POSTFX_DISABLE = 0x5F48DF
+    POSTFX_COLOURS = 0x6C8678
+    PLAYERS = 0x6C8CD8
+    COLOURFILTER_CALL = 0x24C826
+    TIME_SCALE = 0x56B76C
+    IDLECAM_KICKIN = 0x6C5030             # gIdleCam 0x6C5008 +0x28
 
 
 def capture(path, title_prefix="xemu |"):

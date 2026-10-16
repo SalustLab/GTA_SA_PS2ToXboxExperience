@@ -12,9 +12,10 @@ Core finding: `timecyc.dat` and all assets are identical between the PS2 and Xbo
 
 ## Hard rules
 
-- **Never modify the originals.** Both ISOs and the extracted folders are read-only: `Microsoft - Xbox/…(Rev 1)/` and `Sony - PlayStation 2/…(v3.00) (Rev 1)/`. Work only on copies under `work/`.
+- **Never modify the originals.** Both ISOs and the extracted folders are read-only: `Microsoft - Xbox/…(Rev 1)/`, the Rev 0 Redump ISO `Microsoft - Xbox/Grand Theft Auto - San Andreas (USA) (En,Es).iso`, and `Sony - PlayStation 2/…(v3.00) (Rev 1)/`. Work only on copies under `work/`.
 - The originals, `work/`, `captures/` and `dist/*.xbe` are gitignored (copyrighted and huge). Never commit Rockstar bytes. Committed patch JSONs guard original bytes with `orig_sha1` instead of `orig` for this reason. A distributed mod ships only an xdelta/BPS diff plus the ini lines to change (PLAN §15).
-- The only supported target is `default.xbe` USA Rev 1, SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5`. Tools must verify this hash and refuse any other input.
+- The supported targets are `default.xbe` USA Rev 1, SHA1 `10EFB868F13D6944AA6684A52CAC5156393F14C5`, and USA Rev 0, SHA1 `1CEAE5BE753B3675CE8C5C79D7F496DFC0AD597D`. Tools must verify the hash and refuse any other input.
+- Rev 1 is the reference: every address in the docs and generators is a Rev 1 VA. Rev 0 builds come from the same generators with `--rev0` (output `patches/pN_*.rev0.json`, with `xbe_sha1`), which map each address through `tools/rev0_map.py`. Never hand-write a Rev 0 address; add it to a generator via `A()` so it gets proven. Proven pairs are cached in `patches/rev0_map.json` (delete it to re-prove).
 - Label claims with the evidence legend from PLAN.md:
   - **[C]** confirmed from bytes or source;
   - **[S]** strongly inferred;
@@ -24,10 +25,11 @@ Core finding: `timecyc.dat` and all assets are identical between the PS2 and Xbo
 
 ## Address conventions (Xbox)
 
-Addresses are VAs in `default.xbe`. To get the file offset:
+Addresses are VAs in the Rev 1 `default.xbe`. To get the file offset:
 - `.text`: file offset = VA − `0x10000`
 - `.data`: file offset = VA − `0xFB60`
 - `.rdata`: file offset = VA − `0x10280`
+- Rev 0: `.text` is the same, `.data` VA − `0xF920`, `.rdata` VA − `0x10080`. Use `rev0_map.offset()` instead of hard-coding deltas.
 
 `xbe_patch.py` maps VAs through the XBE section headers, so these deltas matter only for hand-reading bytes. Any `.data` VA ≥ `0x3D2C04` is BSS, and the `D3D` section's deferred-state area near `0x36BBF8` is partly BSS too. BSS is zero at boot and has no file bytes, so read it from a running emulator. The key anchors (ColourFilter `0x24F007`, Radiosity `0x24DF8E`, PostFX Render `0x24C537`, RW state ids, …) are listed in PLAN §9. Live RAM addresses (clock, weather, player, PostFX colours `0x6C88B8`, blur pass `0x24ECAA`, gamma ramp) are in findings.md, "RE target 6" and later entries.
 
@@ -43,7 +45,8 @@ There is no build system, linter or test suite. Each script has an assert-based 
 | `tools/xbe_patch.py <in.xbe> <out.xbe> <patch.json…>` | Applies patch JSONs. Refuses a wrong input SHA1, BSS targets, overlaps, and any original-byte mismatch. Also refuses to overwrite its input or to write into the originals. |
 | `tools/predict_filter.py` | Expected PS2 or Xbox colour-filter output for a postfx-off frame plus c1/c2. |
 | `tools/compare.py captures/<scene>` | PLAN §16 metrics. The reference is `ps2.png` and every other `*.png` is a variant. Writes `metrics.json` and `_diff_*.png`. Files starting with `_` are ignored as inputs. |
-| `tools/xemu_gdb.py <cmd>` | Live Xbox pokes and captures through the xemu GDB stub (port 1234): `clock`, `weather`, `postfx`, `filter`, `teleport`, `timescale`, `idlecam`, `capture`. Add `--cxbx` to target Cxbx-Reloaded. |
+| `tools/xemu_gdb.py <cmd>` | Live Xbox pokes and captures through the xemu GDB stub (port 1234): `clock`, `weather`, `postfx`, `filter`, `teleport`, `timescale`, `idlecam`, `capture`. Add `--cxbx` to target Cxbx-Reloaded, `--rev0` for the Rev 0 game. |
+| `tools/rev0_map.py <rev1.xbe> <rev0.xbe> <va>…` | Rev 1 → Rev 0 address map, proven by code alignment, agreeing references, or caller/function proofs. Also the `--rev0` helpers the generators import. |
 | `tools/pcsx2_pine.py <cmd>` | The same for PS2 through PCSX2 PINE (port 28011). |
 | `tools/ps2_cheats.pnach` | Alternative PS2 clock and weather freeze. Install instructions are in its header. |
 
@@ -51,7 +54,7 @@ There is no build system, linter or test suite. Each script has an assert-based 
 
 1. Each patch is authored as a generator script, `patches/pN_*.py`. It holds keystone assembly, reads `work/xbox/default.xbe`, and writes `patches/pN_*.json` with `orig_sha1` guards. Example: `py patches/p1_colourfilter.py`.
 2. Apply it: `py tools/xbe_patch.py work/xbox/default.xbe dist/default_pN.xbe patches/pN_*.json`.
-3. Boot test: copy `work/xbox/gtasa_stock.xiso` and replace the embedded `default.xbe` in place. It sits at sector 348678, is 4018176 bytes, and keeps the same size. The Redump ISO doesn't boot in xemu. `gtasa_stock.xiso` is its game partition, from offset `0x18300000` to the end.
+3. Boot test: copy `work/xbox/gtasa_stock.xiso` and replace the embedded `default.xbe` in place. It sits at sector 348678, is 4018176 bytes, and keeps the same size. Rev 0: `work/xbox_rev0/gtasa_stock.xiso`, XBE at sector 348552 (same size). The Redump ISO doesn't boot in xemu. `gtasa_stock.xiso` is its game partition, from offset `0x18300000` to the end.
 4. Before editing a patch, test it as a live RAM poke in xemu (E4 style).
 
 ## Captures and experiments

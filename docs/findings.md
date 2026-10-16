@@ -885,3 +885,41 @@ Symbols come from the Cxbx-Reloaded symbol cache (`E:\Emuladores\Cxbx-Reloaded\S
   - `xiso.xdelta` (28,595 B) on `gtasa_stock.xiso` gives a byte-identical `gtasa_v1.1.xiso`. On that rebuilt image it fails with "target window checksum mismatch", exit 1.
   - `redump-iso.xdelta` (29,818 B) on a synthetic Redump (random 0x18300000-byte video partition + `gtasa_stock.xiso`, 7,825,162,240 B): the video partition is untouched and the game partition equals `gtasa_v1.1.xiso`. Synthetic files deleted.
   - Not tested: a real Redump Rev 1 dump (none on this box).
+
+## 2026-10-16 — USA Rev 0 port
+
+- **Target [C]:** the Redump image `Grand Theft Auto - San Andreas (USA) (En,Es).iso` (7,825,162,240 B, the same layout as Rev 1: game partition at 0x18300000). Its `default.xbe` sits at partition sector 348552, 4018176 B, sha1 **1ceae5be…**. That is the XBE of the rebuilt xiso noted on 2026-10-12, so that image was Rev 0. Cert title ID 0x54540082 (Rev 1: 0x545400A3). Working copies: `work/xbox_rev0/gtasa_stock.xiso` (ISO[0x18300000:]) and `default.xbe`.
+- **Layout [C]:** the same build with small code changes. `.text` is 0x200 B shorter, every later section starts 0x200 lower except `.data` (−0x240, same vsize). Inside `.text` the shift is piecewise: −0x2CF around PostFX (ColourFilter, Radiosity, blur pass, guard), −0xB9 at the stream.ini parser, −0x200 at RW. The building-pipe area 0x166C70–0x16AFA8 is reordered. Rev 1 has a 0x26 B stub at 0x166C4A that Rev 0 lacks, and the shared setup 0x16A1E5 moved to 0x167C14.
+- **Method:** `tools/rev0_map.py` disassembles the code sections of both XBEs and aligns them, masking absolute operands, in two passes. Pass 1 builds a data map from paired instructions. Pass 2 repeats with those proven addresses translated rather than masked, which separates functions that differ only in a global, such as the four building pipes with different VS handles. A Rev 1 address is accepted only if:
+  - code: its ±256-instruction window matches one Rev 0 candidate clearly best (difflib), or every caller of the function calls one Rev 0 target ("callers"), or it sits inside such a function at an equal offset with all instructions between equal ("function");
+  - data: every reference to it pairs with one Rev 0 value ("xref").
+
+  Generators run with `--rev0`. Each address goes through `A()`, which raises if the address is unproven. Proven pairs: `patches/rev0_map.json` (64 entries).
+- **[S] exceptions:** `D3D_g_RenderState` ALPHA_TEST/BLEND 0x36E378/0x36E374 (P6b) have no direct reference (indexed). The D3D library section is identical modulo relocations: 1339 differing bytes, 1113 explained as dwords shifted −0x200/−0x228/−0x240, the rest rel32 calls. So they map at −0x200 (0x36E178/0x36E174).
+- **Notable proofs [C]:** the DN setups 0x166C70 → 0x166BEC and 0x1675DF → 0x16755C (each Rev 0 copy reads the mapped VS handle and DN balance). The shared setup 0x16A1E5 → 0x167C14: its four Rev 1 callers (pipes with VS 0x5F2934/40/60/84) map to the four Rev 0 calls at the shifts their own VS references give (+0x19C ×3, −0xF0). P4's `stock_ok` / `c23_stock_ok`, P2's call-site check, P5's 0.35 check, P6b's site check and P7's handler bytes all pass on Rev 0.
+- **Build:** all Rev 1 JSONs regenerate byte-identical, and Rev 1 v1.1 is still 84e14eef…. Rev 0 P2 + P3 + P4 + P5 + P6b + P7 (`*.rev0.json`, `xbe_sha1` = Rev 0) → `dist/default_rev0_v1.1.xbe` sha1 **6883102c…**, 2434 bytes changed (Rev 1: 2434). `xbe_patch.py` refuses Rev 1 JSONs on Rev 0 and the reverse.
+- **Boot test [C]:** `work/xbox_rev0/gtasa_rev0_v1.1.xiso` (XBE at sector 348552) boots in xemu and plays. P2's jmp is live in RAM. Live reads through `xemu_gdb.py --rev0` (data −0x240): clock, position, idle cam 90000, pe offsets 8 with the stock `stream.ini` (P7), radiosity flag 0. Grove St 12:00, weather 0: Rev 0 mod ground/sky medians (156,100,52)/(121,204,200) vs Rev 1 mod (153,98,51)/(116,204,198); Rev 1 stock ground (133,114,96). The camera angles differ, so these are regional medians, not a per-pixel diff. **User visual sign-off ✅** ("the mod is identical and working").
+- **Release:** `default_rev0.xbe.xdelta` (1472 B), `rev0-xiso.xdelta` (28,587 B) and `rev0-redump-iso.xdelta` (29,810 B, 51 runs). Decoded with xdelta3 3.1.0 [C]:
+  - the XBE patch gives 6883102c…;
+  - the XISO patch gives a byte-identical `gtasa_rev0_v1.1.xiso`;
+  - the Redump patch, applied to the **real** Rev 0 Redump ISO, leaves the video partition untouched and makes the game partition equal to the boot-tested XISO;
+  - each patch fails with "target window checksum mismatch" on the Rev 1 source.
+
+  `apply_patch.py` picks the patch by SHA1 (table stock → (mod, xdelta)). On a Rev 0 folder and a Rev 0 XISO copy it gives 6883102c… with a stock `.bak`, and a re-run prints "already patched". A Rev 1 folder still gives 84e14eef….
+- **GUI patcher [C]:** xdeltaUI with `default_rev0.xbe.xdelta` on the stock Rev 0 XBE gives 6883102c….
+- **Real hardware [C] (user report, 2026-10-16):** that `default.xbe` in an extracted Rev 0 game folder runs fine on the user's Xbox (Cerbios + XBMC4Gamers).
+- **Not tested:** a per-pixel A/B with the same save and camera, and the Rev 0 ISO patches in a GUI patcher (they were decoded with xdelta3 only).
+
+## 2026-10-16 — Release v1.2 (Rev 0 support)
+
+- **Package:** `dist/SA-PS2Atmosphere-v1.2.zip` (47 KB):
+  - `install_instructions.txt` (quick guide: xdelta GUIs, web, CLI, Python);
+  - `README.md`;
+  - `Rev 1/` and `Rev 0/`, each with `default.xbe.xdelta`, `iso.xdelta` (full Redump-layout ISO, formerly `redump-iso.xdelta`) and `xiso.xdelta`;
+  - `apply_patch.py` (the patch table now points into the two folders) and `xdvdfs_extract.py`.
+
+  The Rev 1 patched bytes are unchanged from v1.1 (84e14eef…); only the ISO patches' internal output names say v1.2. The user-facing docs name the ISO by its game title and say the ISO patches target the Redump dumps.
+- **Validation [C]:**
+  - every packaged xdelta decodes with xdelta3 3.1.0: XBE patches → 84e14eef… / 6883102c…; XISO patches → byte-identical modded XISOs;
+  - `Rev 0/iso.xdelta` on the real Rev 0 Redump ISO changes exactly 2434 bytes, and the embedded XBE is 6883102c…;
+  - the packaged `apply_patch.py` patches a Rev 0 and a Rev 1 folder correctly.

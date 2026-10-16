@@ -1,0 +1,33 @@
+PS2 Atmosphere v1.2 for GTA San Andreas (Xbox, USA) - quick install
+=====================================================================
+
+1. Find your version
+   Rev 1: default.xbe SHA1 10EFB868F13D6944AA6684A52CAC5156393F14C5
+          ISO name: Grand Theft Auto - San Andreas (USA) (En,Es) (Rev 1).iso
+   Rev 0: default.xbe SHA1 1CEAE5BE753B3675CE8C5C79D7F496DFC0AD597D
+          ISO name: Grand Theft Auto - San Andreas (USA) (En,Es).iso
+   Not sure? Try one folder's patch: the wrong one stops with
+   "checksum mismatch" and changes nothing.
+
+2. Pick the patch from the "Rev 1" or "Rev 0" folder
+   default.xbe from a game folder  ->  default.xbe.xdelta
+   Full ISO (7,825,162,240 B)      ->  iso.xdelta
+   XISO (7,419,363,328 B)          ->  xiso.xdelta
+   (ISO patches are made for the Redump dumps; Rev 0 tested on its Redump image.)
+
+3a. Easiest: an xdelta app
+   - Windows: xdelta UI or Delta Patcher.
+     Source/original = your file, Patch = the .xdelta, Output = a new file name.
+   - Web: Rom Patcher JS (www.marcrobledo.com/RomPatcher.js), for
+     default.xbe only (the ISOs are too big for a browser).
+   - Command line: xdelta3 -d -s default.xbe default.xbe.xdelta default_patched.xbe
+   Then copy the patched default.xbe into your game folder (keep the original).
+
+3b. Or with Python 3 (patches a folder or an ISO in place, makes a .bak first,
+   picks Rev 1 / Rev 0 by itself). Put xdelta3.exe next to apply_patch.py:
+       py apply_patch.py "E:\Games\GTA San Andreas"
+       py apply_patch.py "GTA San Andreas.iso"
+
+Only default.xbe changes; stream.ini and the rest stay untouched.
+Needs a modded Xbox or xemu (the patched XBE is not retail-signed).
+Full guide: README.md

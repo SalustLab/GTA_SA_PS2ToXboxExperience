@@ -12,20 +12,23 @@ P7 inverts both ends (sete / jne): the byte now means "radiosity off". So radios
 Usage: py patches/p7_ini_defaults.py [--selftest]      -> writes patches/p7_ini_defaults.json
 """
 import hashlib
-import json
+import struct
 import sys
 from pathlib import Path
 
 from capstone import CS_ARCH_X86, CS_MODE_32, Cs
 
-XBE = Path(__file__).resolve().parents[1] / "work" / "xbox" / "default.xbe"
-TEXT = 0x10000                                   # .text file offset = VA - 0x10000
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+from rev0_map import XBE, A, write_json  # noqa: E402  (--rev0: Rev 1 VAs below are mapped to Rev 0)
+
+TEXT = 0x10000                                   # .text file offset = VA - 0x10000 (both revisions)
+MOV_PE = lambda va: "a3" + struct.pack("<I", A(va)).hex()   # mov [va], eax
 # (va, stock bytes, new bytes, note)
-EDITS = [(va, bytes.fromhex(old), bytes.fromhex(new), note) for va, old, new, note in (
-    (0x158063, "a308e83c00", "9090909090", "pe_leftx handler: drop mov [0x3CE808], eax (keep .data 8)"),
-    (0x158084, "a30ce83c00", "9090909090", "pe_rightx handler: drop mov [0x3CE80C], eax (keep .data 8)"),
-    (0x1580A2, "a310e83c00", "9090909090", "pe_topy handler: drop mov [0x3CE810], eax (keep .data 8)"),
-    (0x1580C0, "a314e83c00", "9090909090", "pe_bottomy handler: drop mov [0x3CE814], eax (keep .data 8)"),
+EDITS = [(A(va), bytes.fromhex(old), bytes.fromhex(new), note) for va, old, new, note in (
+    (0x158063, MOV_PE(0x3CE808), "9090909090", "pe_leftx handler: drop mov [0x3CE808], eax (keep .data 8)"),
+    (0x158084, MOV_PE(0x3CE80C), "9090909090", "pe_rightx handler: drop mov [0x3CE80C], eax (keep .data 8)"),
+    (0x1580A2, MOV_PE(0x3CE810), "9090909090", "pe_topy handler: drop mov [0x3CE810], eax (keep .data 8)"),
+    (0x1580C0, MOV_PE(0x3CE814), "9090909090", "pe_bottomy handler: drop mov [0x3CE814], eax (keep .data 8)"),
     (0x1580E1, "95", "94", "pe_bRadiosity handler: setne al -> sete al ([0x5F4B1C] = radiosity off)"),
     (0x24CD4A, "74", "75", "radiosity guard: je skip -> jne skip (runs while [0x5F4B1C] == 0)"),
 )]
@@ -41,16 +44,16 @@ def selftest():
     assert radiosity_runs(None) and radiosity_runs(1) and not radiosity_runs(0)
     md = Cs(CS_ARCH_X86, CS_MODE_32)
     # the 1-byte edits land on the opcode bytes: decode the whole patched instructions
-    assert next(md.disasm(bytes.fromhex("0f94c0"), 0x1580E0)).mnemonic == "sete"
-    j = next(md.disasm(bytes.fromhex("7539"), 0x24CD4A))
-    assert (j.mnemonic, j.op_str) == ("jne", "0x24cd85")         # same target as the stock je
+    assert next(md.disasm(bytes.fromhex("0f94c0"), A(0x1580E0))).mnemonic == "sete"
+    j = next(md.disasm(bytes.fromhex("7539"), A(0x24CD4A)))
+    assert (j.mnemonic, j.op_str) == ("jne", f"{A(0x24CD85):#x}")        # same target as the stock je
     for va, old, new, _ in EDITS:
         assert len(old) == len(new), hex(va)
     print("p7_ini_defaults selftest OK")
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ["--selftest"]:
+    if "--selftest" in sys.argv:
         selftest()
         sys.exit()
     xbe = XBE.read_bytes()
@@ -60,5 +63,4 @@ if __name__ == "__main__":
            "requires": ["p2_filterblur", "p3_radiosity"],
            "patches": [{"va": hex(va), "orig_sha1": hashlib.sha1(old).hexdigest(), "len": len(old),
                         "new": new.hex(), "note": note} for va, old, new, note in EDITS]}
-    Path(__file__).with_suffix(".json").write_text(json.dumps(out, indent=2))
-    print(f"wrote {Path(__file__).with_suffix('.json').name}")
+    print(f"wrote {write_json(__file__, out).name}")

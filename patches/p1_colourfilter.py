@@ -14,21 +14,22 @@ it alone while its cache 0x75D5A0 stays 4. It is restored to MODULATE before ret
 Usage: py patches/p1_colourfilter.py [k]      -> writes patches/p1_colourfilter.json
 """
 import hashlib
-import json
 import sys
 from pathlib import Path
 
 from keystone import KS_ARCH_X86, KS_MODE_32, Ks
 
-START, END = 0x24F007, 0x24F133            # original function, 300 bytes (ret at 0x24F132)
-XBE = Path(__file__).resolve().parents[1] / "work" / "xbox" / "default.xbe"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+from rev0_map import XBE, A, offset, write_json  # noqa: E402  (--rev0: Rev 1 VAs below are mapped to Rev 0)
+
+START, END = A(0x24F007), A(0x24F133)      # original function, 300 bytes (ret at 0x24F132)
 
 
-BLUR_ENABLE = 0x3CE7AD                     # .data byte, 1 in the stock XBE; gates the blur pass 0x24ECAA
+BLUR_ENABLE = A(0x3CE7AD)                    # .data byte, 1 in the stock XBE; gates the blur pass 0x24ECAA
 
 
-PE_OFFSETS = 0x3CE808                      # int left, top, right, bottom (stream.ini pe_leftx..; PS2 8, Xbox 16)
-QUAD = 0x5C7318                            # 4 Im2D verts, stride 28, UV at +0x14/+0x18: v0 TL, v1 BL, v2 BR, v3 TR
+PE_OFFSETS = A(0x3CE808)                     # int left, top, right, bottom (stream.ini pe_leftx..; PS2 8, Xbox 16)
+QUAD = A(0x5C7318)                           # 4 Im2D verts, stride 28, UV at +0x14/+0x18: v0 TL, v1 BL, v2 BR, v3 TR
 
 
 def _pass2(blur):
@@ -66,7 +67,7 @@ def _pass2(blur):
         pop ecx
         rep movsd dword ptr es:[edi], dword ptr [esi]   # quad -> stack; the original stays unshifted for next frame
         pop edi
-        mov eax, dword ptr [0x5f4b28]       # copy raster: RwRaster width +0xC, height +0x10
+        mov eax, dword ptr [{A(0x5f4b28):#x}]  # copy raster: RwRaster width +0xC, height +0x10
         mov ecx, dword ptr [eax + 0xc]
         shl ecx, 4
         mov edx, dword ptr [eax + 0x10]
@@ -92,21 +93,21 @@ def _helpers(blur, s):
         or edx, eax
         inc esi
         loop chan
-        mov dword ptr [0x5c7328], edx
-        mov dword ptr [0x5c7344], edx
-        mov dword ptr [0x5c7360], edx
-        mov dword ptr [0x5c737c], edx"""
-    draw = """
+        mov dword ptr [{A(0x5c7328):#x}], edx
+        mov dword ptr [{A(0x5c7344):#x}], edx
+        mov dword ptr [{A(0x5c7360):#x}], edx
+        mov dword ptr [{A(0x5c737c):#x}], edx"""
+    draw = f"""
         push 6
-        push 0x3ce82c
+        push {A(0x3ce82c):#x}
         push 4
-        push {verts}
+        push {{verts}}
         push 3
-        call dword ptr [0x75de94]           # Im2DRenderIndexedPrimitive
+        call dword ptr [{A(0x75de94):#x}]   # Im2DRenderIndexedPrimitive
         add esp, 0x14
         ret"""
     if not blur:                            # P1 layout, byte-identical to the v0.1 build
-        return pack.replace("pack:", "pack_draw:") + draw.replace("{verts}", "0x5c7318")
+        return pack.replace("pack:", "pack_draw:") + draw.replace("{verts}", f"{QUAD:#x}")
     return f"""
     pack_draw:
         call pack
@@ -127,7 +128,7 @@ def build(k=1.0, blur=False, start=START, end=END):
         xor ebx, ebx
         inc ebx
         xor esi, esi
-        mov edi, dword ptr [0x75de80]       # RwRenderStateSet, callee-saved register
+        mov edi, dword ptr [{A(0x75de80):#x}]  # RwRenderStateSet, callee-saved register
         push ebx
         push 9
         call edi           # filter NEAREST
@@ -140,7 +141,7 @@ def build(k=1.0, blur=False, start=START, end=END):
         push esi
         push 8
         call edi           # zwrite off
-        push dword ptr [0x5f4b28]
+        push dword ptr [{A(0x5f4b28):#x}]
         push ebx
         call edi           # raster = fb copy
         push ebx
@@ -153,8 +154,8 @@ def build(k=1.0, blur=False, start=START, end=END):
         push 0xb
         call edi           # dst ZERO
         add esp, 0x40
-        mov dword ptr [0x36bbf8], {op}      # stage0 COLOROP = MODULATE2X/4X (D3D only)
-        or dword ptr [0x36e280], 0x800
+        mov dword ptr [{A(0x36bbf8):#x}], {op}  # stage0 COLOROP = MODULATE2X/4X (D3D only)
+        or dword ptr [{A(0x36e280):#x}], 0x800
         lea esi, [ebp + 8]
         mov dl, 0xff
         call pack_draw                      # pass 1: c1*S, A=FF
@@ -165,8 +166,8 @@ def build(k=1.0, blur=False, start=START, end=END):
         push 0xb
         call edi           # dst ONE
 {_pass2(blur)}
-        mov dword ptr [0x36bbf8], 4         # restore MODULATE
-        or dword ptr [0x36e280], 0x800
+        mov dword ptr [{A(0x36bbf8):#x}], 4  # restore MODULATE
+        or dword ptr [{A(0x36e280):#x}], 0x800
         push 2
         push 9
         call edi           # original restore tail
@@ -200,15 +201,16 @@ def build(k=1.0, blur=False, start=START, end=END):
 
 
 if __name__ == "__main__":
-    k = float(sys.argv[1]) if len(sys.argv) > 1 else 1.0
+    args = [a for a in sys.argv[1:] if a != "--rev0"]
+    k = float(args[0]) if args else 1.0
     new, s = build(k)
     xbe = XBE.read_bytes()
     orig = xbe[START - 0x10000:END - 0x10000]
-    blur = xbe[BLUR_ENABLE - 0xFB60:BLUR_ENABLE - 0xFB60 + 1]
+    blur = xbe[offset(xbe, BLUR_ENABLE):offset(xbe, BLUR_ENABLE) + 1]
     out = {"name": f"P1 ColourFilter PS2 formula (k={k}, S={s}/256) + Xbox blur pass off",
            "patches": [{"va": hex(START), "orig_sha1": hashlib.sha1(orig).hexdigest(), "len": len(orig),
                         "new": new.hex(), "note": "full rewrite of CPostEffects::ColourFilter 0x24F007-0x24F132"},
                        {"va": hex(BLUR_ENABLE), "orig_sha1": hashlib.sha1(blur).hexdigest(), "len": 1,
                         "new": "00", "note": "disable the Xbox blur pass 0x24ECAA (re-adds the pre-filter frame)"}]}
-    Path(__file__).with_suffix(".json").write_text(json.dumps(out, indent=2))
-    print(f"{len(new.rstrip(bytes([0xcc])))} code bytes / {len(new)}; S={s}; wrote {Path(__file__).with_suffix('.json').name}")
+    path = write_json(__file__, out)
+    print(f"{len(new.rstrip(bytes([0xcc])))} code bytes / {len(new)}; S={s}; wrote {path.name}")

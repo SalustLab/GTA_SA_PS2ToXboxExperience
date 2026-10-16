@@ -22,7 +22,6 @@ whose per-material upload 0x166EE3 is shared with vehicles).
 Usage: py patches/p4_building_ambient.py [--selftest]      -> writes patches/p4_building_ambient.json
 """
 import hashlib
-import json
 import struct
 import sys
 from pathlib import Path
@@ -31,13 +30,14 @@ from capstone import CS_ARCH_X86, CS_MODE_32, Cs
 from keystone import KS_ARCH_X86, KS_MODE_32, Ks
 
 G, N, KA = 0.91, 0.80, 1.80                     # findings "P4 v2 step 2"
-XBE = Path(__file__).resolve().parents[1] / "work" / "xbox" / "default.xbe"
-P_AMBIENT, RW_CUR_VS = 0x5F4BFC, 0x3D4750
-BUILDING_VS_SHARED = (0x5F2934, 0x5F2940)        # handles that reach the shared setup 0x16A1E5 from building pipes
-BLOCKS = ((0x166D91, 0x166DE7, "ebp + 0x54", False),   # (start, end, c15 stack slot, shared -> check the VS)
-          (0x167700, 0x167756, "ebp + 0x54", False),
-          (0x16A30A, 0x16A360, "ebp - 0x20", True))
-C23 = ((0x166E4C, 0x3C9B10), (0x1677BB, 0x3C9DA4))    # (site, DN balance global); 41 B, ends at the upload call
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+from rev0_map import XBE, A, write_json  # noqa: E402  (--rev0: Rev 1 VAs below are mapped to Rev 0)
+P_AMBIENT, RW_CUR_VS = A(0x5F4BFC), A(0x3D4750)
+BUILDING_VS_SHARED = (A(0x5F2934), A(0x5F2940))      # handles that reach the shared setup 0x16A1E5 from building pipes
+BLOCKS = ((A(0x166D91), A(0x166DE7), "ebp + 0x54", False),   # (start, end, c15 stack slot, shared -> check the VS)
+          (A(0x167700), A(0x167756), "ebp + 0x54", False),
+          (A(0x16A30A), A(0x16A360), "ebp - 0x20", True))
+C23 = ((A(0x166E4C), A(0x3C9B10)), (A(0x1677BB), A(0x3C9DA4)))    # (site, DN balance global); 41 B, ends at the upload call
 C23_LEN = 41
 K_C23 = BLOCKS[0][1] - 32                        # constants live in the tail of block 0x166D91, after its jmp
 K_AMB = K_C23 + 16
@@ -71,7 +71,7 @@ def c23_stock_ok(xbe, site, bal):
                    ("subss", "xmm1, xmm0"), ("lea", "edx, [ebp + 0x28]"), ("pop", "ecx"),
                    ("movss", "dword ptr [ebp + 0x28], xmm0"), ("movss", "dword ptr [ebp + 0x2c], xmm1"),
                    ("movss", "dword ptr [ebp + 0x30], xmm7"), ("movss", "dword ptr [ebp + 0x34], xmm7"),
-                   ("call", "0x35d0a0")], (hex(site), ops)
+                   ("call", f"{A(0x35D0A0):#x}")], (hex(site), ops)
 
 
 def asm(src, va):
@@ -148,7 +148,7 @@ def selftest():
         assert ("movups", f"xmm1, xmmword ptr [{K_C23:#x}]") in ops and ("mulps", "xmm0, xmm1") in ops
         assert ("push", "0x77") in ops and ("lea", "edx, [ebp + 0x28]") in ops and ("pop", "ecx") in ops
         assert not any(o.split(", ")[0] in ("xmm4", "xmm7") for _, o in ops), "xmm4/xmm7 must survive"
-        assert next(md.disasm(text(xbe, site + C23_LEN, 5), site + C23_LEN)).op_str == "0x35d0a0"
+        assert next(md.disasm(text(xbe, site + C23_LEN, 5), site + C23_LEN)).op_str == f"{A(0x35D0A0):#x}"
     # model: noon (b 0) day-only, night (b 1) night-only, ambient clamp
     assert abs(model(0, 0.5, 0.3, 0) - 0.5 * G) < 1e-9 and abs(model(1, 0.5, 0.3, 0) - 0.3 * N) < 1e-9
     assert abs(model(0, 0, 0, 2.0) - KA) < 1e-9
@@ -160,5 +160,5 @@ if __name__ == "__main__":
         selftest()
         sys.exit()
     out = {"name": f"P4 v2 PS2 building lighting (c23 x (N {N}, G {G}), c15 x KA {KA})", "patches": patches(XBE.read_bytes())}
-    Path(__file__).with_suffix(".json").write_text(json.dumps(out, indent=2))
-    print(f"{len(out['patches'])} blocks; wrote {Path(__file__).with_suffix('.json').name}")
+    path = write_json(__file__, out)
+    print(f"{len(out['patches'])} blocks; wrote {path.name}")

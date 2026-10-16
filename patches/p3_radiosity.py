@@ -20,24 +20,25 @@ filterPasses = 0 (darkness filter) merges the highlight into the 1:1 composite i
 Usage: py patches/p3_radiosity.py [--selftest]      -> writes patches/p3_radiosity.json
 """
 import hashlib
-import json
 import sys
 from pathlib import Path
 
 from keystone import KS_ARCH_X86, KS_MODE_32, Ks
 
-START, END = 0x24DF8E, 0x24E513            # stock Radiosity, ret at 0x24E512 [C]; 0x24E513 is another function
-XBE = Path(__file__).resolve().parents[1] / "work" / "xbox" / "default.xbe"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+from rev0_map import XBE, A, write_json  # noqa: E402  (--rev0: Rev 1 VAs below are mapped to Rev 0)
 
-RWSTATE, IM2D_INDEXED = 0x75DE80, 0x75DE94  # [RwRenderStateSet], [RwIm2DRenderIndexedPrimitive]
-CAM_END, CAM_BEGIN = 0x2977F0, 0x297800     # RwCameraEndUpdate / RwCameraBeginUpdate (cdecl, camera)
-SCENE_CAM, POSTFX_CAM = 0x5B8528, 0x5F4B30  # postfx camera raster = the copy C
-COPY, SCREEN = 0x5F4B28, 0x5F4B2C          # RwRaster*: fb copy (width +0xC, height +0x10), backbuffer
-FB_COPY = 0x24BB7B                          # BB -> C full-screen copy (leaves NEAREST, fog/vtxalpha off, clamp)
-SCREEN_W, SCREEN_H = 0x5B8530, 0x5B8534
-UCORR, VCORR = 0x3CE7D4, 0x3CE7D8          # m_RadiosityFilterU/VCorrection (2, 2)
-QUAD, INDICES = 0x5C7318, 0x3CE82C         # ColourFilter quad (template for z/rhw), indices 0,1,2, 0,2,3
-COLOROP, DIRTY = 0x36BBF8, 0x36E280        # D3D stage-0 COLOROP (deferred) + dirty 0x800, as in P1
+START, END = A(0x24DF8E), A(0x24E513)  # stock Radiosity, ret at 0x24E512 [C]; 0x24E513 is another function
+
+RWSTATE, IM2D_INDEXED = A(0x75DE80), A(0x75DE94)  # [RwRenderStateSet], [RwIm2DRenderIndexedPrimitive]
+CAM_END, CAM_BEGIN = A(0x2977F0), A(0x297800)  # RwCameraEndUpdate / RwCameraBeginUpdate (cdecl, camera)
+SCENE_CAM, POSTFX_CAM = A(0x5B8528), A(0x5F4B30)  # postfx camera raster = the copy C
+COPY, SCREEN = A(0x5F4B28), A(0x5F4B2C)  # RwRaster*: fb copy (width +0xC, height +0x10), backbuffer
+FB_COPY = A(0x24BB7B)  # BB -> C full-screen copy (leaves NEAREST, fog/vtxalpha off, clamp)
+SCREEN_W, SCREEN_H = A(0x5B8530), A(0x5B8534)
+UCORR, VCORR = A(0x3CE7D4), A(0x3CE7D8)  # m_RadiosityFilterU/VCorrection (2, 2)
+QUAD, INDICES = A(0x5C7318), A(0x3CE82C)  # ColourFilter quad (template for z/rhw), indices 0,1,2, 0,2,3
+COLOROP, DIRTY = A(0x36BBF8), A(0x36E280)# D3D stage-0 COLOROP (deferred) + dirty 0x800, as in P1
 MODULATE, ADDSIGNED2X = 4, 9
 
 # frame (ebp): args +8 limit, +0xC passes, +0x10 intensity; locals below; P = draw block at ebp-0x4C (= esp)
@@ -396,5 +397,5 @@ if __name__ == "__main__":
     out = {"name": "P3 Radiosity, PS2 behaviour (SkyGfx geometry; needs stream.ini pe_bRadiosity 1)",
            "patches": [{"va": hex(START), "orig_sha1": hashlib.sha1(orig).hexdigest(), "len": len(orig),
                         "new": new.hex(), "note": "full rewrite of CPostEffects::Radiosity 0x24DF8E-0x24E512"}]}
-    Path(__file__).with_suffix(".json").write_text(json.dumps(out, indent=2))
-    print(f"{len(new.rstrip(bytes([0xcc])))} code bytes / {len(new)}; wrote {Path(__file__).with_suffix('.json').name}")
+    path = write_json(__file__, out)
+    print(f"{len(new.rstrip(bytes([0xcc])))} code bytes / {len(new)}; wrote {path.name}")

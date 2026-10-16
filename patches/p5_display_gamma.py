@@ -10,15 +10,15 @@ matches the Xbox framebuffer with no ramp). The slider still works (exp = 1.35 -
 Usage: py patches/p5_display_gamma.py [--selftest]      -> writes patches/p5_display_gamma.json
 """
 import hashlib
-import json
 import struct
 import sys
 from pathlib import Path
 
-INSN, OLD, NEW = 0x27468E, 0x390A24, 0x390C44   # addss xmm0, dword ptr [OLD]  (F3 0F 58 05 imm32)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+from rev0_map import XBE, A, offset, write_json  # noqa: E402  (--rev0: Rev 1 VAs below are mapped to Rev 0)
+
+INSN, OLD, NEW = A(0x27468E), A(0x390A24), A(0x390C44)   # addss xmm0, dword ptr [OLD]  (F3 0F 58 05 imm32)
 STOCK, FIXED = 0.2, 0.35
-XBE = Path(__file__).resolve().parents[1] / "work" / "xbox" / "default.xbe"
-RDATA = 0x10280                                  # .rdata file offset = VA - 0x10280
 
 
 def f32(v):
@@ -40,18 +40,17 @@ def selftest():
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ["--selftest"]:
+    if "--selftest" in sys.argv:
         selftest()
         sys.exit()
     xbe = XBE.read_bytes()
     op = INSN + 4
     insn = xbe[INSN - 0x10000:INSN - 0x10000 + 8]
     assert insn == bytes.fromhex("f30f5805") + struct.pack("<I", OLD), insn.hex()
-    assert xbe[NEW - RDATA:NEW - RDATA + 4] == struct.pack("<f", FIXED)
+    assert xbe[offset(xbe, NEW, 4):offset(xbe, NEW, 4) + 4] == struct.pack("<f", FIXED)
     orig = insn[4:]
     out = {"name": "P5 neutral display gamma at default brightness (SetBrightness reads 0.35, not pooled 0.2)",
            "patches": [{"va": hex(op), "orig_sha1": hashlib.sha1(orig).hexdigest(), "len": 4,
                         "new": struct.pack("<I", NEW).hex(),
                         "note": "addss operand at 0x27468E: [0x390A24] 0.2 -> [0x390C44] 0.35 (read-only .rdata)"}]}
-    Path(__file__).with_suffix(".json").write_text(json.dumps(out, indent=2))
-    print(f"wrote {Path(__file__).with_suffix('.json').name}")
+    print(f"wrote {write_json(__file__, out).name}")

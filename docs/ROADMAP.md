@@ -4,8 +4,8 @@ Ideas and open items collected after release, mostly from user feedback. Nothing
 
 ## Next: other USA versions
 
-- **Support every USA release, not only Rev 1.** That means the original stock release (Rev 0) and any other USA revisions that exist. The Redump list is where to check which ones. Each version needs its own address map, the patches ported to it, and its own SHA1 accepted by the tools and the release.
-- Starting point: a rebuilt xiso found locally (`default.xbe` sha1 1ceae5be…). It's probably Rev 0, which isn't confirmed (findings, "Whole-ISO xdelta patches").
+- ~~**USA Rev 0.**~~ Done 2026-10-16: `default.xbe` sha1 1ceae5be… is the Redump Rev 0 image; v1.1 is ported, released as `default_rev0.xbe.xdelta` / `rev0-xiso.xdelta` / `rev0-redump-iso.xdelta` (findings "USA Rev 0 port").
+- **Any other USA revisions.** Check the Redump list. A new close build can reuse `tools/rev0_map.py` (it maps Rev 1 VAs to another build by code alignment).
 
 ## Investigate
 

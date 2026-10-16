@@ -1,4 +1,4 @@
-"""Apply patches/*.json to a copy of GTA SA Xbox default.xbe (USA Rev 1 only).
+"""Apply patches/*.json to a copy of GTA SA Xbox default.xbe (USA Rev 1, or Rev 0 with the *.rev0.json builds).
 
 Usage:
   py tools/xbe_patch.py <in.xbe> <out.xbe> <patch.json> [patch.json ...]
@@ -10,7 +10,8 @@ Patch JSON:
   "orig_sha1" (SHA1 of the original bytes, same length as "new") may replace "orig", so
   committed patch files carry no Rockstar bytes. An optional top-level "requires": ["p2_filterblur"]
   names patch files (by stem) that must be applied in the same run (e.g. code placed in bytes another
-  patch makes dead).
+  patch makes dead). "xbe_sha1" names the input the file was built for (absent = Rev 1); all files in
+  one run must agree, and the input must have that SHA1.
 
 VAs are mapped to file offsets through the XBE section headers. The tool refuses:
 wrong input SHA1, a VA outside a section's raw data (BSS), overlapping entries,
@@ -25,6 +26,8 @@ import sys
 from pathlib import Path
 
 REV1_SHA1 = "10efb868f13d6944aa6684a52cac5156393f14c5"
+REV0_SHA1 = "1ceae5be753b3675ce8c5c79d7f496dfc0ad597d"
+TARGETS = {REV1_SHA1: "USA Rev 1", REV0_SHA1: "USA Rev 0"}
 ORIGINAL_DIRS = ("Microsoft - Xbox", "Sony - PlayStation 2")
 
 
@@ -54,10 +57,19 @@ def check_requires(docs):
             raise ValueError(f"{s} requires {', '.join(missing)} in the same run")
 
 
+def target_sha1(docs):
+    """The one input SHA1 all patch files were built for: "xbe_sha1" (Rev 0 builds), absent = Rev 1."""
+    want = {j.get("xbe_sha1", REV1_SHA1).lower() for _, j in docs}
+    if len(want) != 1 or not want <= TARGETS.keys():
+        raise ValueError(f"patch files target {sorted(want)}: all must be built for one known default.xbe")
+    return want.pop()
+
+
 def load_entries(paths):
     entries = []
     docs = [(Path(p).stem, json.loads(Path(p).read_text())) for p in paths]
     check_requires(docs)
+    sha1 = target_sha1(docs)
     for p, (_, j) in zip(paths, docs):
         for e in j["patches"]:
             new = bytes.fromhex(e["new"])
@@ -65,13 +77,13 @@ def load_entries(paths):
             if not new or (isinstance(orig, bytes) and len(orig) != len(new)):
                 raise ValueError(f"{p}: {e['va']}: orig/new must be non-empty and equal length")
             entries.append((int(e["va"], 16), orig, new, str(p)))
-    return entries
+    return entries, sha1
 
 
 def apply(xbe, entries, expected_sha1=REV1_SHA1):
     got = hashlib.sha1(xbe).hexdigest()
     if got != expected_sha1:
-        raise ValueError(f"input SHA1 {got} is not default.xbe USA Rev 1 ({expected_sha1})")
+        raise ValueError(f"input SHA1 {got} is not default.xbe {TARGETS.get(expected_sha1, '?')} ({expected_sha1})")
     secs = sections(xbe)
     out = bytearray(xbe)
     ranges = []
@@ -93,7 +105,7 @@ def main(argv):
     src, dst = Path(src).resolve(), Path(dst).resolve()
     if dst == src or any(d in dst.parts for d in ORIGINAL_DIRS):
         raise SystemExit(f"refusing to write {dst}: never overwrite the input or the originals")
-    out = apply(src.read_bytes(), load_entries(patch_files))
+    out = apply(src.read_bytes(), *load_entries(patch_files))
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_bytes(out)
     print(f"wrote {dst} sha1={hashlib.sha1(out).hexdigest()}")
@@ -131,6 +143,15 @@ def selftest():
         raise AssertionError("missing requirement accepted")
     except ValueError:
         pass
+    assert target_sha1([("p1", {}), ("p2", {})]) == REV1_SHA1                  # no field = Rev 1 (old JSONs)
+    assert target_sha1([("p1.rev0", {"xbe_sha1": REV0_SHA1})]) == REV0_SHA1
+    for bad in ([("p1", {}), ("p2.rev0", {"xbe_sha1": REV0_SHA1})],              # Rev 1 and Rev 0 patches mixed
+                [("x", {"xbe_sha1": "00" * 20})]):                               # unknown target
+        try:
+            target_sha1(bad)
+            raise AssertionError(f"accepted {bad}")
+        except ValueError:
+            pass
     print("xbe_patch selftest OK")
 
 
