@@ -9,7 +9,7 @@ PS2 Atmosphere v1.2 for GTA San Andreas (Xbox, USA) - quick install
    Not sure? Try one folder's patch: the wrong one stops with
    "checksum mismatch" and changes nothing.
 
-2. Pick the patch from the "Rev 1" or "Rev 0" folder
+2. Pick the patch from the "GTA SA (USA) Rev 1" or "GTA SA (USA) Rev 0" folder
    default.xbe from a game folder  ->  default.xbe.xdelta
    Full ISO (7,825,162,240 B)      ->  iso.xdelta
    XISO (7,419,363,328 B)          ->  xiso.xdelta

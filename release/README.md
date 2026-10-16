@@ -28,9 +28,9 @@ What changes:
 
 Pick the patch that matches the file you have:
 
-The patches are in two folders, `Rev 1` and `Rev 0`, with the same three files in each:
+The patches are in two folders, `GTA SA (USA) Rev 1` and `GTA SA (USA) Rev 0`, with the same three files in each:
 
-| Your file | Patch (in `Rev 1/` or `Rev 0/`) |
+| Your file | Patch (in `GTA SA (USA) Rev 1/` or `GTA SA (USA) Rev 0/`) |
 |---|---|
 | `default.xbe` from a game folder (for example on the Xbox hard drive) | `default.xbe.xdelta` |
 | Full game ISO, 7,825,162,240 bytes: `Grand Theft Auto - San Andreas (USA) (En,Es) (Rev 1).iso`, or `Grand Theft Auto - San Andreas (USA) (En,Es).iso` for Rev 0 | `iso.xdelta` |
@@ -53,7 +53,7 @@ The wrong file is rejected with *"checksum mismatch"*. An ISO that was rebuilt o
 Command line equivalent:
 
 ```
-xdelta3 -d -s default.xbe "Rev 1/default.xbe.xdelta" default_patched.xbe    # or "Rev 0/..."
+xdelta3 -d -s default.xbe "GTA SA (USA) Rev 1/default.xbe.xdelta" default_patched.xbe    # or "GTA SA (USA) Rev 0/..."
 ```
 
 ## Install with the script (folders and ISO images)

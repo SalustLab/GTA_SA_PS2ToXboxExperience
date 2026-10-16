@@ -1,6 +1,6 @@
 """PS2 Atmosphere installer for GTA San Andreas (Xbox, USA Rev 1 or Rev 0).
 
-Patches default.xbe with "Rev 1/default.xbe.xdelta" or "Rev 0/default.xbe.xdelta", picked by its SHA1.
+Patches default.xbe with "GTA SA (USA) Rev 1/default.xbe.xdelta" or "GTA SA (USA) Rev 0/default.xbe.xdelta", picked by its SHA1.
 That is the whole mod: since v1.1 the PS2 stream.ini settings are built into default.xbe, so stream.ini stays
 untouched.
 
@@ -25,8 +25,8 @@ sys.path.append(os.path.dirname(HERE))  # repo layout: xdvdfs_extract.py sits on
 from xdvdfs_extract import SECTOR, image_files  # noqa: E402
 
 XBE = {  # stock default.xbe SHA1 -> (patched SHA1, xdelta file)
-    "10efb868f13d6944aa6684a52cac5156393f14c5": ("84e14eef41e0e83d7191a66973c99959815d7553", "Rev 1/default.xbe.xdelta"),  # USA Rev 1
-    "1ceae5be753b3675ce8c5c79d7f496dfc0ad597d": ("6883102c897eaa58e8e01fb41a51b9c4b44b481d", "Rev 0/default.xbe.xdelta"),  # USA Rev 0
+    "10efb868f13d6944aa6684a52cac5156393f14c5": ("84e14eef41e0e83d7191a66973c99959815d7553", "GTA SA (USA) Rev 1/default.xbe.xdelta"),  # USA Rev 1
+    "1ceae5be753b3675ce8c5c79d7f496dfc0ad597d": ("6883102c897eaa58e8e01fb41a51b9c4b44b481d", "GTA SA (USA) Rev 0/default.xbe.xdelta"),  # USA Rev 0
 }
 OLDER = {"2d1829b5647f05930290d6e56425a4b656b8937b": "PS2 Atmosphere v1.0"}
 
@@ -146,7 +146,7 @@ def selftest():
     assert pick(sha1(b"x"), {sha1(b"x"): ("m", "a.xdelta")}) == ((sha1(b"x"), "m"), "a.xdelta")
     assert pick("m", {sha1(b"x"): ("m", "a.xdelta")})[1] == "a.xdelta"               # an already-patched file
     assert pick("zz", {sha1(b"x"): ("m", "a.xdelta")}) is None                       # unknown: patched() refuses
-    assert {pick(s)[1] for s in XBE} == {"Rev 1/default.xbe.xdelta", "Rev 0/default.xbe.xdelta"}
+    assert {pick(s)[1] for s in XBE} == {"GTA SA (USA) Rev 1/default.xbe.xdelta", "GTA SA (USA) Rev 0/default.xbe.xdelta"}
     print("apply_patch selftest OK")
 
 

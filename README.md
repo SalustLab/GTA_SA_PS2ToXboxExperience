@@ -106,7 +106,7 @@ You need **your own** copy of GTA San Andreas, **USA, Rev 1** (`default.xbe` SHA
 1. Grab **`SA-PS2Atmosphere-v1.2.zip`** from [Releases](https://github.com/SalustLab/GTA_SA_PS2ToXboxExperience/releases/latest) and unzip it.
 2. Open your xdelta patcher (Delta Patcher, xdelta UI, any of them) and pick the patch that matches your file:
 
-   | Your file | Patch (in the `Rev 1` or `Rev 0` folder) |
+   | Your file | Patch (in the `GTA SA (USA) Rev 1` or `GTA SA (USA) Rev 0` folder) |
    |---|---|
    | `default.xbe` from a game folder | `default.xbe.xdelta` |
    | Full game ISO (7,825,162,240 bytes) | `iso.xdelta` |
@@ -207,17 +207,17 @@ For Rev 0, run each generator with `--rev0`: it writes `patches/pN_*.rev0.json`,
 ### Building the release
 
 ```sh
-R=dist/SA-PS2Atmosphere-v1.2; mkdir -p "$R/Rev 1" "$R/Rev 0"
+R=dist/SA-PS2Atmosphere-v1.2; mkdir -p "$R/GTA SA (USA) Rev 1" "$R/GTA SA (USA) Rev 0"
 # Rev 1
-xdelta3 -e -9 -S none -A=default.xbe//default.xbe/ -f -s work/xbox/default.xbe dist/default_v1.1.xbe "$R/Rev 1/default.xbe.xdelta"
+xdelta3 -e -9 -S none -A=default.xbe//default.xbe/ -f -s work/xbox/default.xbe dist/default_v1.1.xbe "$R/GTA SA (USA) Rev 1/default.xbe.xdelta"
 N="Grand Theft Auto - San Andreas (USA) (En,Es) (Rev 1) (PS2 Atmosphere v1.2)"
-py tools/iso_xdelta.py work/xbox/gtasa_stock.xiso work/xbox/gtasa_v1.1.xiso "$R/Rev 1/xiso.xdelta" --name "$N.xiso"
-py tools/iso_xdelta.py work/xbox/gtasa_stock.xiso work/xbox/gtasa_v1.1.xiso "$R/Rev 1/iso.xdelta" --redump --name "$N.iso"
+py tools/iso_xdelta.py work/xbox/gtasa_stock.xiso work/xbox/gtasa_v1.1.xiso "$R/GTA SA (USA) Rev 1/xiso.xdelta" --name "$N.xiso"
+py tools/iso_xdelta.py work/xbox/gtasa_stock.xiso work/xbox/gtasa_v1.1.xiso "$R/GTA SA (USA) Rev 1/iso.xdelta" --redump --name "$N.iso"
 # Rev 0
-xdelta3 -e -9 -S none -A=default.xbe//default.xbe/ -f -s work/xbox_rev0/default.xbe dist/default_rev0_v1.1.xbe "$R/Rev 0/default.xbe.xdelta"
+xdelta3 -e -9 -S none -A=default.xbe//default.xbe/ -f -s work/xbox_rev0/default.xbe dist/default_rev0_v1.1.xbe "$R/GTA SA (USA) Rev 0/default.xbe.xdelta"
 N="Grand Theft Auto - San Andreas (USA) (En,Es) (PS2 Atmosphere v1.2)"
-py tools/iso_xdelta.py work/xbox_rev0/gtasa_stock.xiso work/xbox_rev0/gtasa_rev0_v1.1.xiso "$R/Rev 0/xiso.xdelta" --name "$N.xiso"
-py tools/iso_xdelta.py work/xbox_rev0/gtasa_stock.xiso work/xbox_rev0/gtasa_rev0_v1.1.xiso "$R/Rev 0/iso.xdelta" --redump --name "$N.iso"
+py tools/iso_xdelta.py work/xbox_rev0/gtasa_stock.xiso work/xbox_rev0/gtasa_rev0_v1.1.xiso "$R/GTA SA (USA) Rev 0/xiso.xdelta" --name "$N.xiso"
+py tools/iso_xdelta.py work/xbox_rev0/gtasa_stock.xiso work/xbox_rev0/gtasa_rev0_v1.1.xiso "$R/GTA SA (USA) Rev 0/iso.xdelta" --redump --name "$N.iso"
 cp release/README.md release/install_instructions.txt release/apply_patch.py xdvdfs_extract.py "$R/"
 (cd dist && py -m zipfile -c SA-PS2Atmosphere-v1.2.zip SA-PS2Atmosphere-v1.2)
 ```

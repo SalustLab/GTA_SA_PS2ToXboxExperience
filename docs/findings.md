@@ -915,11 +915,11 @@ Symbols come from the Cxbx-Reloaded symbol cache (`E:\Emuladores\Cxbx-Reloaded\S
 - **Package:** `dist/SA-PS2Atmosphere-v1.2.zip` (47 KB):
   - `install_instructions.txt` (quick guide: xdelta GUIs, web, CLI, Python);
   - `README.md`;
-  - `Rev 1/` and `Rev 0/`, each with `default.xbe.xdelta`, `iso.xdelta` (full Redump-layout ISO, formerly `redump-iso.xdelta`) and `xiso.xdelta`;
+  - `GTA SA (USA) Rev 1/` and `GTA SA (USA) Rev 0/`, each with `default.xbe.xdelta`, `iso.xdelta` (full Redump-layout ISO, formerly `redump-iso.xdelta`) and `xiso.xdelta`;
   - `apply_patch.py` (the patch table now points into the two folders) and `xdvdfs_extract.py`.
 
   The Rev 1 patched bytes are unchanged from v1.1 (84e14eef…); only the ISO patches' internal output names say v1.2. The user-facing docs name the ISO by its game title and say the ISO patches target the Redump dumps.
 - **Validation [C]:**
   - every packaged xdelta decodes with xdelta3 3.1.0: XBE patches → 84e14eef… / 6883102c…; XISO patches → byte-identical modded XISOs;
-  - `Rev 0/iso.xdelta` on the real Rev 0 Redump ISO changes exactly 2434 bytes, and the embedded XBE is 6883102c…;
+  - `GTA SA (USA) Rev 0/iso.xdelta` on the real Rev 0 Redump ISO changes exactly 2434 bytes, and the embedded XBE is 6883102c…;
   - the packaged `apply_patch.py` patches a Rev 0 and a Rev 1 folder correctly.
