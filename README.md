@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/SalustLab/GTA_SA_PS2ToXboxExperience/releases/latest"><img src="https://img.shields.io/badge/download-v1.2-FFC440?style=for-the-badge&logo=github&logoColor=black&labelColor=1a1a1a" alt="Download v1.2"></a>
+  <a href="https://github.com/SalustLab/GTA_SA_XboxPS2Atmosphere/releases/latest"><img src="https://img.shields.io/badge/download-v1.2-FFC440?style=for-the-badge&logo=github&logoColor=black&labelColor=1a1a1a" alt="Download v1.2"></a>
   <img src="https://img.shields.io/badge/platform-original%20Xbox-107C10?style=for-the-badge&logo=xbox&logoColor=white&labelColor=1a1a1a" alt="Platform: original Xbox">
   <img src="https://img.shields.io/badge/game-GTA%20SA%20%C2%B7%20USA%20Rev%200%20%2F%20Rev%201-F28C28?style=for-the-badge&labelColor=1a1a1a" alt="Game: GTA San Andreas USA Rev 0 / Rev 1">
   <br>
@@ -103,7 +103,7 @@ You need **your own** copy of GTA San Andreas, **USA, Rev 1** (`default.xbe` SHA
 
 **With any xdelta GUI (easiest):**
 
-1. Grab **`SA-PS2Atmosphere-v1.2.zip`** from [Releases](https://github.com/SalustLab/GTA_SA_PS2ToXboxExperience/releases/latest) and unzip it.
+1. Grab **`SA-PS2Atmosphere-v1.2.zip`** from [Releases](https://github.com/SalustLab/GTA_SA_XboxPS2Atmosphere/releases/latest) and unzip it.
 2. Open your xdelta patcher (Delta Patcher, xdelta UI, any of them) and pick the patch that matches your file:
 
    | Your file | Patch (in the `GTA SA (USA) Rev 1` or `GTA SA (USA) Rev 0` folder) |
